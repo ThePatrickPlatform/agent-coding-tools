@@ -29,10 +29,14 @@ project, copy `plugins/dev-team/codex/agents/*.toml` into that project's
 
 ## Plugins
 
-| Plugin | Description |
-| --- | --- |
-| [`dev-team`](plugins/dev-team) | Five role agents for a software team. |
-| [`jira`](plugins/jira) | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
+Each plugin has its own version and stage (`in-progress`, `alpha`, `beta`, or
+`release`). See [Versioning and releases](VERSIONING.md). Normal installs follow
+the default branch, including work in progress.
+
+| Plugin | Stage | Version | Description |
+| --- | --- | --- | --- |
+| [`dev-team`](plugins/dev-team) | in-progress | 0.0.1 | Five role agents for a software team. |
+| [`jira`](plugins/jira) | in-progress | 0.0.1 | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
 
 Install `jira` the same way as `dev-team`, replacing the plugin name. Unlike
 agents, skills install through the plugin in all three tools, so Codex needs no
@@ -75,7 +79,9 @@ plugins/
     .codex-plugin/plugin.json       (manifest for Codex)
     agents/<name>.agent.md          (agents for Claude Code and Copilot CLI)
     codex/agents/<name>.toml        (generated agents for Codex)
-scripts/build_codex_agents.py
+scripts/build_codex_agents.py       (generates the Codex agents)
+scripts/check_versions.py           (checks versions and stages)
+VERSIONING.md                       (versioning and release process)
 ```
 
 Agent files use the `.agent.md` extension, which Copilot CLI requires and Claude
