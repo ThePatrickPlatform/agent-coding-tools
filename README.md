@@ -21,14 +21,15 @@ copilot plugin install dev-team@agent-coding-tools
 ## Plugins
 
 Each plugin has its own version and stage (`in-progress`, `alpha`, `beta`, or
-`release`). See [Versioning and releases](VERSIONING.md). Normal installs follow
+`release`). In-progress plugins live in `plugins/in-progress/` and move up to
+`plugins/` when promoted. See [Versioning and releases](VERSIONING.md). Normal installs follow
 the default branch, including work in progress.
 
 | Plugin | Stage | Version | Description |
 | --- | --- | --- | --- |
-| [`dev-team`](plugins/dev-team) | in-progress | 0.0.2 | Five role agents for a software team. |
-| [`jira`](plugins/jira) | in-progress | 0.0.1 | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
-| [`figma`](plugins/figma) | in-progress | 0.0.1 | A skill for Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
+| [`dev-team`](plugins/in-progress/dev-team) | in-progress | 0.0.2 | Five role agents for a software team. |
+| [`jira`](plugins/in-progress/jira) | in-progress | 0.0.1 | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
+| [`figma`](plugins/in-progress/figma) | in-progress | 0.0.1 | A skill for Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
 
 Install `jira` and `figma` the same way as `dev-team`, replacing the plugin
 name.
@@ -63,7 +64,7 @@ Set up at least one of these:
   browser (OAuth) option.
 - **REST API:** register an OAuth 2.0 (3LO) app with Atlassian and export its
   access token as `JIRA_ACCESS_TOKEN`. See
-  `plugins/jira/skills/jira/references/rest-api.md`.
+  `plugins/in-progress/jira/skills/jira/references/rest-api.md`.
 
 It searches and reads without asking, but shows every change and waits for
 your approval before writing to Jira.
@@ -79,7 +80,7 @@ Set up at least one of these:
   `/mcp` to authenticate.
 - **REST API:** register an OAuth app with Figma and export its access token
   as `FIGMA_ACCESS_TOKEN`. This path can read and comment but cannot edit the
-  canvas. See `plugins/figma/skills/figma/references/rest-api.md`.
+  canvas. See `plugins/in-progress/figma/skills/figma/references/rest-api.md`.
 
 Editing the canvas needs a Full seat, and the MCP server limits calls by seat
 and plan. The skill reads without asking, but shows every comment or change and
@@ -100,7 +101,9 @@ waits for your approval.
 ```
 .claude-plugin/marketplace.json     (catalog for Claude Code and Copilot CLI)
 plugins/
-  <plugin-name>/
+  in-progress/                      (plugins still taking shape)
+    <plugin-name>/
+  <plugin-name>/                    (graduated: alpha, beta, release)
     .claude-plugin/plugin.json      (manifest)
     agents/<name>.agent.md          (agents, if the plugin has any)
     skills/<name>/SKILL.md          (skills, if the plugin has any)

@@ -22,16 +22,31 @@ Passing checks, time passing, or a merged PR never does. Changing stage also
 requires a higher version, for example `0.0.4` in-progress to `0.1.0` alpha, then
 `0.2.0` beta, then `1.0.0` release.
 
-Folders do not change with the stage. A plugin stays at `plugins/<name>/` for
-its whole life, so install commands and links keep working. Read the stage from
-the metadata, never from a path.
+## Folders
+
+The folder shows whether a plugin is still in progress:
+
+```
+plugins/in-progress/<name>/   in-progress plugins
+plugins/<name>/               graduated: alpha, beta, and release
+```
+
+New plugins start in `plugins/in-progress/`. When a maintainer promotes one to
+alpha, move its folder up to `plugins/`, update its `source` in
+`.claude-plugin/marketplace.json`, and bump the version and stage in the same
+PR. Moving the folder does not break installs, because users install by plugin
+name and the marketplace maps names to folders. Links to files inside the
+plugin do change, so update them too.
+
+The metadata gives the exact stage; the folder only separates in-progress from
+graduated. `check_versions.py` fails if the two disagree.
 
 ## Where versions and stages are recorded
 
 **Plugins.** Plugin manifests have no stage field, so the stage is the prefix of
 the plugin's description.
 
-- `version` and `description` in `plugins/<name>/.claude-plugin/plugin.json`
+- `version` and `description` in the plugin's `.claude-plugin/plugin.json`
 - The same `description` in the plugin's entry in `.claude-plugin/marketplace.json`
 
 **Skills.** In the `SKILL.md` frontmatter, with the same prefix on the
@@ -62,7 +77,7 @@ What counts as breaking: a change to what the plugin or skill accepts, what it
 produces, the tools or setup it needs, or the names users invoke. Different
 model wording in the output is not breaking.
 
-Any change inside `plugins/<name>/` bumps that plugin's version. A change
+Any change inside a plugin's folder bumps that plugin's version. A change
 inside a skill's folder also bumps that skill's version. Changes outside
 `plugins/`, such as this file or the README, bump nothing. Several commits in
 one PR share one bump; before merging, recheck against `main` so two PRs do not

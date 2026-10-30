@@ -5,17 +5,17 @@
   "plugins": [
     {
       "name": "dev-team",
-      "source": "./plugins/dev-team",
+      "source": "./plugins/in-progress/dev-team",
       "description": "In progress: Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer."
     },
     {
       "name": "jira",
-      "source": "./plugins/jira",
+      "source": "./plugins/in-progress/jira",
       "description": "In progress: Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API."
     },
     {
       "name": "figma",
-      "source": "./plugins/figma",
+      "source": "./plugins/in-progress/figma",
       "description": "In progress: Read and work with Figma designs using OAuth only, through the Figma MCP server or the REST API."
     }
   ]
