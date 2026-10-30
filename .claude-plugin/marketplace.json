@@ -1,7 +1,7 @@
 {
   "name": "agent-coding-tools",
   "owner": { "name": "ThePatrickPlatform" },
-  "description": "Agents and plugins for coding with Claude Code, GitHub Copilot CLI, and OpenAI Codex.",
+  "description": "Agents and plugins for coding with Claude Code and GitHub Copilot CLI.",
   "plugins": [
     {
       "name": "dev-team",

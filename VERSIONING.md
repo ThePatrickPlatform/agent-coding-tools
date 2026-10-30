@@ -32,7 +32,6 @@ the metadata, never from a path.
 the plugin's description.
 
 - `version` and `description` in `plugins/<name>/.claude-plugin/plugin.json`
-- The same `version` and `description` in `plugins/<name>/.codex-plugin/plugin.json`
 - The same `description` in the plugin's entry in `.claude-plugin/marketplace.json`
 
 **Skills.** In the `SKILL.md` frontmatter, with the same prefix on the
@@ -74,13 +73,12 @@ claim the same version.
 ```
 python scripts/check_versions.py
 python scripts/check_versions.py --base origin/main
-python scripts/build_codex_agents.py --check
 ```
 
-`check_versions.py` checks that versions are valid, match across manifests, and
-fit the stage, and that descriptions carry the right prefix. With `--base`, it
-also fails if a plugin or skill changed since that ref without a version bump.
-The `Checks` workflow runs all of these on every pull request.
+`check_versions.py` checks that versions are valid and fit the stage, and that
+descriptions carry the right prefix and match the marketplace. With `--base`,
+it also fails if a plugin or skill changed since that ref without a version
+bump. The `Checks` workflow runs both on every pull request.
 
 ## Releasing a version
 
@@ -90,7 +88,7 @@ step:
 1. In a PR, review the plugin's contents, stage, and version. Record changes,
    breaking changes with migration steps, and known limitations in the PR.
 2. Run the checks, then install the plugin from your branch in Claude Code,
-   Copilot CLI, and Codex and try it.
+   Copilot CLI and try it.
 3. After merging, create an annotated tag on the tested commit named
    `plugin-<name>-v<version>`, for example `plugin-jira-v0.1.0`.
 4. Create a GitHub Release for the tag with the stage, changes, limitations, and
@@ -104,13 +102,7 @@ released. Other plugins at that commit are not promoted.
 ## Installing a fixed version
 
 Normal installs follow the default branch, including work in progress. To pin
-a released version, add the marketplace at its tag instead of the default
-branch. For Codex:
-
-```
-codex plugin marketplace add ThePatrickPlatform/agent-coding-tools --ref plugin-jira-v0.1.0
-```
-
-For Claude Code and Copilot CLI, check the tool's marketplace documentation for
-how to add a marketplace at a Git ref. The tag in this example is illustrative
-until it is actually published.
+a released version, add the marketplace at its tag, for example
+`plugin-jira-v0.1.0`, instead of the default branch. Check Claude Code's and
+Copilot CLI's marketplace documentation for how to add a marketplace at a Git
+ref. The tag in this example is illustrative until it is actually published.

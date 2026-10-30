@@ -1,8 +1,0 @@
-{
-  "name": "dev-team",
-  "version": "0.0.2",
-  "description": "In progress: Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer.",
-  "author": { "name": "Jeremy Haveard" },
-  "license": "MIT",
-  "repository": "https://github.com/ThePatrickPlatform/agent-coding-tools"
-}

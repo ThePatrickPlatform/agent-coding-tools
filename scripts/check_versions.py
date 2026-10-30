@@ -80,22 +80,17 @@ def read_skill(text):
 
 def check_plugin(plugin_dir, marketplace):
     name = plugin_dir.name
-    claude_path = plugin_dir / ".claude-plugin" / "plugin.json"
-    codex_path = plugin_dir / ".codex-plugin" / "plugin.json"
-    if not claude_path.exists() or not codex_path.exists():
-        error(plugin_dir.relative_to(ROOT), "needs both .claude-plugin and .codex-plugin manifests")
+    manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        error(plugin_dir.relative_to(ROOT), "needs a .claude-plugin/plugin.json manifest")
         return
-    claude = json.loads(claude_path.read_text(encoding="utf-8"))
-    codex = json.loads(codex_path.read_text(encoding="utf-8"))
-    rel = claude_path.relative_to(ROOT)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rel = manifest_path.relative_to(ROOT)
 
-    description = claude.get("description", "")
+    description = manifest.get("description", "")
     stage = stage_from_description(description)
-    check_stage(rel, claude.get("version"), stage)
+    check_stage(rel, manifest.get("version"), stage)
 
-    for key in ("name", "version", "description"):
-        if codex.get(key) != claude.get(key):
-            error(codex_path.relative_to(ROOT), f"{key} differs from {rel}")
     entry = marketplace.get(name)
     if entry is None:
         error(".claude-plugin/marketplace.json", f"no entry for plugin {name}")

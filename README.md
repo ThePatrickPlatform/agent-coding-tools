@@ -1,6 +1,7 @@
 # agent-coding-tools
 
-A plugin marketplace for Claude Code, GitHub Copilot CLI, and OpenAI Codex.
+A plugin marketplace for Claude Code and GitHub Copilot CLI. Both tools read the
+same files in this repo.
 
 ## Install
 
@@ -17,16 +18,6 @@ copilot plugin marketplace add ThePatrickPlatform/agent-coding-tools
 copilot plugin install dev-team@agent-coding-tools
 ```
 
-Codex:
-
-```
-codex plugin marketplace add ThePatrickPlatform/agent-coding-tools
-```
-
-Codex plugins cannot ship agents, so copy the agent files yourself. For one
-project, copy `plugins/dev-team/codex/agents/*.toml` into that project's
-`.codex/agents/`. For every project, copy them into `~/.codex/agents/`.
-
 ## Plugins
 
 Each plugin has its own version and stage (`in-progress`, `alpha`, `beta`, or
@@ -40,8 +31,7 @@ the default branch, including work in progress.
 | [`figma`](plugins/figma) | in-progress | 0.0.1 | A skill for Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
 
 Install `jira` and `figma` the same way as `dev-team`, replacing the plugin
-name. Unlike agents, skills install through the plugin in all three tools, so
-Codex needs no manual copy step.
+name.
 
 ## Shared skills
 
@@ -54,14 +44,13 @@ Each agent's instructions name the skills it uses and what it uses them for:
 | `ux-designer` | | Read designs and tokens; comment; edit frames |
 | `software-engineer` | Read issues; update status; comment with PR links | |
 
-To give an agent a skill, add it to that agent's Skills section, then
-regenerate the Codex agents.
+To give an agent a skill, add it to that agent's Skills section.
 
 In Claude Code, installing `dev-team` also installs `jira` and `figma`. In
-Copilot CLI and Codex, install them separately.
+Copilot CLI, install them separately.
 
-This is guidance, not a lock. None of the three tools can limit a skill to
-specific agents, so any agent can still use any installed skill if asked.
+This is guidance, not a lock. Neither tool can limit a skill to specific
+agents, so any agent can still use any installed skill if asked.
 
 ### jira skill
 
@@ -87,8 +76,7 @@ Set up at least one of these:
 - **MCP:** add the remote Figma MCP server, `https://mcp.figma.com/mcp`, and
   sign in through the browser. In Claude Code:
   `claude mcp add --transport http figma https://mcp.figma.com/mcp`, then
-  `/mcp` to authenticate. In Codex:
-  `codex mcp add figma --url https://mcp.figma.com/mcp`.
+  `/mcp` to authenticate.
 - **REST API:** register an OAuth app with Figma and export its access token
   as `FIGMA_ACCESS_TOKEN`. This path can read and comment but cannot edit the
   canvas. See `plugins/figma/skills/figma/references/rest-api.md`.
@@ -111,14 +99,11 @@ waits for your approval.
 
 ```
 .claude-plugin/marketplace.json     (catalog for Claude Code and Copilot CLI)
-.agents/plugins/marketplace.json    (catalog for Codex)
 plugins/
   <plugin-name>/
-    .claude-plugin/plugin.json      (manifest for Claude Code and Copilot CLI)
-    .codex-plugin/plugin.json       (manifest for Codex)
-    agents/<name>.agent.md          (agents for Claude Code and Copilot CLI)
-    codex/agents/<name>.toml        (generated agents for Codex)
-scripts/build_codex_agents.py       (generates the Codex agents)
+    .claude-plugin/plugin.json      (manifest)
+    agents/<name>.agent.md          (agents, if the plugin has any)
+    skills/<name>/SKILL.md          (skills, if the plugin has any)
 scripts/check_versions.py           (checks versions and stages)
 VERSIONING.md                       (versioning and release process)
 ```
@@ -126,13 +111,3 @@ VERSIONING.md                       (versioning and release process)
 Agent files use the `.agent.md` extension, which Copilot CLI requires and Claude
 Code accepts. They set no `tools` list, because each tool names its tools
 differently; each agent inherits the tools available in the session.
-
-The `.agent.md` files are the source. After editing one, regenerate the Codex
-agents and commit both:
-
-```
-python scripts/build_codex_agents.py
-```
-
-`python scripts/build_codex_agents.py --check` exits non-zero if the Codex
-agents are out of date. When adding a plugin, list it in both catalogs.
