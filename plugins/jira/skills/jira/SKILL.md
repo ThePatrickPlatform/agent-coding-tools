@@ -1,6 +1,9 @@
 ---
 name: jira
-description: Work with Jira Cloud issues using OAuth only - search with JQL, read, create, edit, transition, assign, comment, and link issues. Uses the Atlassian MCP server when connected, otherwise the Atlassian CLI (acli), otherwise the Jira REST API with an OAuth access token. Use when the user mentions Jira, an issue key such as PROJ-123, JQL, or wants stories, bugs, or tasks created or updated in Jira.
+description: "In progress: Work with Jira Cloud issues using OAuth only - search with JQL, read, create, edit, transition, assign, comment, and link issues. Uses the Atlassian MCP server when connected, otherwise the Atlassian CLI (acli), otherwise the Jira REST API with an OAuth access token. Use when the user mentions Jira, an issue key such as PROJ-123, JQL, or wants stories, bugs, or tasks created or updated in Jira."
+metadata:
+  version: "0.0.1"
+  lifecycle: "in-progress"
 ---
 
 # Jira

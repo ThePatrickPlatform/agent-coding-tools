@@ -6,12 +6,12 @@
     {
       "name": "dev-team",
       "source": "./plugins/dev-team",
-      "description": "Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer."
+      "description": "In progress: Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer."
     },
     {
       "name": "jira",
       "source": "./plugins/jira",
-      "description": "Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API."
+      "description": "In progress: Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API."
     }
   ]
 }
