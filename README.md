@@ -35,12 +35,33 @@ the default branch, including work in progress.
 
 | Plugin | Stage | Version | Description |
 | --- | --- | --- | --- |
-| [`dev-team`](plugins/dev-team) | in-progress | 0.0.1 | Five role agents for a software team. |
+| [`dev-team`](plugins/dev-team) | in-progress | 0.0.2 | Five role agents for a software team. |
 | [`jira`](plugins/jira) | in-progress | 0.0.1 | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
+| [`figma`](plugins/figma) | in-progress | 0.0.1 | A skill for Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
 
-Install `jira` the same way as `dev-team`, replacing the plugin name. Unlike
-agents, skills install through the plugin in all three tools, so Codex needs no
-manual copy step.
+Install `jira` and `figma` the same way as `dev-team`, replacing the plugin
+name. Unlike agents, skills install through the plugin in all three tools, so
+Codex needs no manual copy step.
+
+## Shared skills
+
+Skills live in their own plugins so any agent, or you directly, can use them.
+Each agent's instructions name the skills it uses and what it uses them for:
+
+| Agent | jira | figma |
+| --- | --- | --- |
+| `product-owner` | Read the backlog; create epics and stories | Review designs against stories; comment |
+| `ux-designer` | | Read designs and tokens; comment; edit frames |
+| `software-engineer` | Read issues; update status; comment with PR links | |
+
+To give an agent a skill, add it to that agent's Skills section, then
+regenerate the Codex agents.
+
+In Claude Code, installing `dev-team` also installs `jira` and `figma`. In
+Copilot CLI and Codex, install them separately.
+
+This is guidance, not a lock. None of the three tools can limit a skill to
+specific agents, so any agent can still use any installed skill if asked.
 
 ### jira skill
 
@@ -57,6 +78,24 @@ Set up at least one of these:
 
 It searches and reads without asking, but shows every change and waits for
 your approval before writing to Jira.
+
+### figma skill
+
+The skill only signs in through OAuth. It never uses personal access tokens.
+Set up at least one of these:
+
+- **MCP:** add the remote Figma MCP server, `https://mcp.figma.com/mcp`, and
+  sign in through the browser. In Claude Code:
+  `claude mcp add --transport http figma https://mcp.figma.com/mcp`, then
+  `/mcp` to authenticate. In Codex:
+  `codex mcp add figma --url https://mcp.figma.com/mcp`.
+- **REST API:** register an OAuth app with Figma and export its access token
+  as `FIGMA_ACCESS_TOKEN`. This path can read and comment but cannot edit the
+  canvas. See `plugins/figma/skills/figma/references/rest-api.md`.
+
+Editing the canvas needs a Full seat, and the MCP server limits calls by seat
+and plan. The skill reads without asking, but shows every comment or change and
+waits for your approval.
 
 ### dev-team agents
 

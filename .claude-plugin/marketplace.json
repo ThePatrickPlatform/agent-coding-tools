@@ -1,7 +1,7 @@
 {
   "name": "agent-coding-tools",
   "owner": { "name": "ThePatrickPlatform" },
-  "description": "Agents and plugins for coding with Claude Code and GitHub Copilot CLI.",
+  "description": "Agents and plugins for coding with Claude Code, GitHub Copilot CLI, and OpenAI Codex.",
   "plugins": [
     {
       "name": "dev-team",
@@ -12,6 +12,11 @@
       "name": "jira",
       "source": "./plugins/jira",
       "description": "In progress: Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API."
+    },
+    {
+      "name": "figma",
+      "source": "./plugins/figma",
+      "description": "In progress: Read and work with Figma designs using OAuth only, through the Figma MCP server or the REST API."
     }
   ]
 }
