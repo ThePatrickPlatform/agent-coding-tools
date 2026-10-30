@@ -1,0 +1,7 @@
+{
+  "name": "dev-team",
+  "version": "0.1.0",
+  "description": "Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer.",
+  "author": { "name": "Jeremy Haveard" },
+  "license": "MIT"
+}
