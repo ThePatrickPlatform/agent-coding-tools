@@ -1,0 +1,7 @@
+{
+  "name": "jira",
+  "version": "0.1.0",
+  "description": "Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API.",
+  "author": { "name": "Jeremy Haveard" },
+  "license": "MIT"
+}
