@@ -82,11 +82,13 @@ test("locked site: bulk content edits and deletes are denied", () => {
   assert.equal(run("Bash", { command: "acli jira workitem delete --key W-1 --yes" }), "deny");
 });
 
-test("locked site: REST writes are denied, plain reads allowed", () => {
+test("locked site: REST writes are denied, other REST calls ask", () => {
   const url = "https://api.atlassian.com/ex/jira/abc-123/rest/api/3/issue/W-1";
   const auth = '-H "Authorization: Bearer $JIRA_ACCESS_TOKEN"';
   assert.equal(run("Bash", { command: `curl -X PUT ${url} ${auth} --data @f.json` }), "deny");
-  assert.equal(run("Bash", { command: `curl ${url} ${auth}` }), "allow");
+  assert.equal(run("Bash", { command: `curl ${url} ${auth}` }), "ask");
+  const fullWork = { sites: { [WORK]: { profile: "full" } } };
+  assert.equal(run("Bash", { command: `curl https://${WORK}/rest/api/3/issue/W-1` }, { withPolicy: fullWork }), "allow");
   assert.equal(run("PowerShell", { command: `Invoke-RestMethod -Method Put -Uri https://${WORK}/rest/api/3/issue/W-1` }), "deny");
 });
 
@@ -209,4 +211,20 @@ test("guard files are caught when globbed, quoted, or at a custom path", () => {
 test("lower-case shell tool names are still checked", () => {
   assert.equal(run("bash", { command: "acli jira workitem delete --key W-1 --yes" }), "deny");
   assert.equal(run("powershell", { command: "acli jira workitem delete --key W-1 --yes" }), "deny");
+});
+
+test("acli only counts as the command itself", () => {
+  const url = `https://${WORK}/rest/api/3/issue/W-1`;
+  const disguised = `curl -X PUT ${url} --data @b.json acli jira workitem comment --key W-1`;
+  assert.equal(run("Bash", { command: disguised }), "deny");
+  const fakeCreate = `printf '{"key":"W-9"}' acli jira workitem create --type Task`;
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: fakeCreate }, tool_response: { stdout: '{"key":"W-9"}' } }), null);
+  assert.equal(run("Bash", { command: "/usr/local/bin/acli jira workitem delete --key W-1 --yes" }), "deny");
+});
+
+test("combined or shortened HTTP flags still need approval", () => {
+  const url = `https://${WORK}/rest/api/3/issue/W-1`;
+  for (const command of [`curl -sX PUT ${url}`, `curl -sSd @body.json ${url}`, `curl -sT f.json ${url}`, `irm ${url} -Meth Put -InF b.json`]) {
+    assert.notEqual(run("Bash", { command }), "allow", command);
+  }
 });

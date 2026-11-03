@@ -75,11 +75,14 @@ its own limits by mistake.
 The hook catches mistakes; it is not a security boundary. Jira's own
 permissions are the real authority. In particular:
 
-- **Shell checks are best-effort.** The hook reads the command text. It blocks
-  REST writes it can see and asks when a command reaches an Atlassian site in
-  a way it cannot read, but it cannot see a site address hidden in a
-  variable, built at run time, or kept in a script file that is written first
-  and run later.
+- **Shell checks are best-effort.** The hook reads the command text. On a
+  site that is not `full`, it blocks REST writes it can see and asks before
+  any other command that reaches the site outside `acli`. It cannot see a site
+  address hidden in a variable, built at run time, or kept in a script file
+  that is written first and run later.
+- **Set `JIRA_POLICY_FILE` only in your own shell profile.** The hook protects
+  the policy file itself, but not settings files that could point the
+  variable somewhere else.
 - **It only sees the agent's own tool calls,** not other programs, scripts,
   or anything you run yourself.
 - **It needs Node.js.** Without it, Claude Code skips the hook and the policy

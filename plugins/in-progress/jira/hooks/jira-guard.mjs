@@ -49,12 +49,12 @@ const ACLI_EDIT_FLAGS = {
 };
 const ACLI_NEUTRAL_FLAGS = new Set(["--yes", "-y", "--json", "--key", "-k", "--jql", "--filter", "--help", "-h"]);
 
-// Shell checks are best-effort: they catch common HTTP clients, and ask
-// whenever a command reaches Atlassian in a way they cannot read.
+// Shell checks are best-effort. On a site that is not "full", any command
+// that reaches Atlassian outside acli is denied when it visibly writes and
+// asks otherwise; the guard does not try to prove a REST call only reads.
 const REST_HOST = /([a-z0-9-]+\.atlassian\.net)|api\.atlassian\.com\/ex\/jira\/([\w-]+)/i;
 const REST_WRITE =
   /(-X|--request|-Method|--method)[\s=]*['"]?(POST|PUT|PATCH|DELETE)\b|(^|\s)(-d|--data[\w-]*|--json|-F|--form|-T|--upload-file|-Body|-InFile|--post-data|--post-file|--body-data|--body-file)(?=[\s=@'"]|$)/im;
-const REST_READ_SEGMENT = /^\s*(curl|wget|Invoke-RestMethod|Invoke-WebRequest|irm|iwr|\$?\w+\s*=)(\s|$)/i;
 const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
 // In shell commands, also catch globbed or quoted forms such as ~/.agent-coding-*.
 const GUARD_SHELL = /\.agent-coding|jira-policy|jira-created/i;
@@ -84,7 +84,8 @@ function classifyShell(command) {
   const actions = [];
   const other = [];
   for (const segment of command.split(/[;&|\n]+/)) {
-    const acli = segment.match(/\bacli(?:\.exe)?\s+jira\s+(.*)/i);
+    // acli counts only as the command itself, not as words inside another one.
+    const acli = segment.match(/^\s*(?:\S*[\\/])?acli(?:\.exe)?\s+jira\s+(.*)/i);
     if (acli) {
       const action = classifyAcli(tokenize(acli[1]));
       if (action) actions.push({ ...action, site: "acli" });
@@ -98,9 +99,7 @@ function classifyShell(command) {
   const onlyAcli = other.length === 0 && actions.length > 0;
   if (host && !onlyAcli) {
     const site = host[1] ?? host[2];
-    const readable = !OPAQUE.test(command) && other.every((segment) => REST_READ_SEGMENT.test(segment));
-    if (REST_WRITE.test(command)) actions.push({ kind: "rest-write", site });
-    else if (!readable) actions.push({ kind: "rest-unknown", site });
+    actions.push({ kind: REST_WRITE.test(command) ? "rest-write" : "rest-unknown", site });
   }
   if (GUARD_SHELL.test(command)) actions.push({ kind: "guard-file" });
   return actions;
@@ -225,7 +224,7 @@ export function decide(action, rule, createdKeys) {
     case "rest-write":
       return deny(`Writes through the REST API are not allowed on ${where}. Use the Atlassian MCP server or acli.`);
     case "rest-unknown":
-      return ask(`This command reaches ${where} and may change it. Approve only if it only reads.`);
+      return ask(`This command reaches ${where} outside acli and may change it. Approve only if it only reads.`);
     default:
       return ask(`This Jira change on ${where} is not covered by the policy. Approve only if it does not change ${locked} content.`);
   }
