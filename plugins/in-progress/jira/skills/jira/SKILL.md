@@ -2,7 +2,7 @@
 name: jira
 description: "In progress: Work with Jira Cloud issues using OAuth only - search with JQL, read, create, edit, transition, assign, comment, and link issues. Uses the Atlassian MCP server when connected, otherwise the Atlassian CLI (acli), otherwise the Jira REST API with an OAuth access token. Use when the user mentions Jira, an issue key such as PROJ-123, JQL, or wants stories, bugs, or tasks created or updated in Jira."
 metadata:
-  version: "0.0.1"
+  version: "0.0.2"
   lifecycle: "in-progress"
 ---
 
@@ -35,6 +35,11 @@ If none works, stop and tell the user how to set one up:
 
 ## Rules
 
+- **Follow the site policy.** If `~/.agent-coding-tools/jira-policy.json` (or
+  the file in `JIRA_POLICY_FILE`) exists, it sets what you may change on each
+  site, for example locking story and epic content at work. Check it before
+  every write, and offer the allowed alternative when a change is blocked. See
+  [references/site-policy.md](references/site-policy.md).
 - **Read freely, confirm before writing.** Searching and viewing need no
   approval. Before creating, editing, transitioning, assigning, commenting,
   linking, or deleting, show the user exactly what will be sent (issue keys,

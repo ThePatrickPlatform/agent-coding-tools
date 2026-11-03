@@ -1,0 +1,11 @@
+{
+  "default": "read-only",
+  "sites": {
+    "your-personal-site.atlassian.net": { "profile": "full" },
+    "your-company.atlassian.net": {
+      "profile": "story-content-locked",
+      "lockedTypes": ["Story", "Epic"],
+      "editableFields": ["assignee"]
+    }
+  }
+}

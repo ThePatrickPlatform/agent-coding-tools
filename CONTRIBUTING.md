@@ -86,6 +86,16 @@ match `plugin.json` exactly. `category` is `agent`, `skill`, or
 
 Then add a row to the plugin table in [README.md](README.md).
 
+Add it to `setup/profiles.json` so the setup script installs it:
+
+- **Agent:** add its name to each profile it belongs in. Its dependencies are
+  installed automatically, so do not list them.
+- **Integration that needs an MCP server:** add an entry under `mcpServers`
+  keyed by the plugin name, with the server's `name`, `url`, and a `match`
+  string that identifies it in a tool's server list.
+- **Removing or renaming a plugin:** add the old name to `retired`, so setup
+  uninstalls it from everyone's machine.
+
 ## 5. Check and try it
 
 ```

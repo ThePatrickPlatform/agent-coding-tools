@@ -46,8 +46,14 @@ user's approval before writing.
   Claude Code accepts it.
 - Do not set `tools` in agent frontmatter. The two tools name tools
   differently, so agents inherit the session's tools.
-- Do not use features only one tool supports, such as hooks, unless the plugin
-  says which tool it is for.
+- Hooks go in `hooks/hooks.json` in Claude Code's format, with `PreToolUse`
+  and other PascalCase event names. Copilot CLI reads that file too, and both
+  set `CLAUDE_PLUGIN_ROOT`. Match shell tools as `Bash|PowerShell`; MCP tools
+  are named `mcp__<server>__<tool>` in Claude Code and `<server>-<tool>` in
+  Copilot CLI. Write hook scripts in Node.js with no dependencies, and test
+  them with `node --test`.
+- Do not use features only one tool supports unless the plugin says which
+  tool it is for.
 
 ## Versions and folders
 

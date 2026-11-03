@@ -1,0 +1,17 @@
+{
+  "marketplace": {
+    "name": "agent-coding-tools",
+    "repo": "ThePatrickPlatform/agent-coding-tools"
+  },
+  "profiles": {
+    "all": ["product-owner", "ux-designer", "architect", "software-engineer", "qa-engineer"],
+    "product-owner": ["product-owner"],
+    "designer": ["ux-designer"],
+    "engineer": ["architect", "software-engineer", "qa-engineer"]
+  },
+  "mcpServers": {
+    "jira": { "name": "atlassian", "url": "https://mcp.atlassian.com/v1/mcp", "match": "atlassian" },
+    "figma": { "name": "figma", "url": "https://mcp.figma.com/mcp", "match": "figma" }
+  },
+  "retired": ["dev-team"]
+}
