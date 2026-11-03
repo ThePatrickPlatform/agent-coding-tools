@@ -80,6 +80,10 @@ permissions are the real authority. In particular:
   any other command that reaches the site outside `acli`. It cannot see a site
   address hidden in a variable, built at run time, or kept in a script file
   that is written first and run later.
+- **It does not protect itself.** An agent that edits the installed plugin
+  files or turns the plugin off disables the hook; only the tool's normal
+  permission prompts stand in the way. Keep those prompts on for files outside
+  your project.
 - **Set `JIRA_POLICY_FILE` only in your own shell profile.** The hook protects
   the policy file itself, but not settings files that could point the
   variable somewhere else.

@@ -228,3 +228,37 @@ test("combined or shortened HTTP flags still need approval", () => {
     assert.notEqual(run("Bash", { command }), "allow", command);
   }
 });
+
+test("hidden or indirect commands ask on limited sites", () => {
+  const url = `https://${WORK}/rest/api/3/issue/W-1`;
+  assert.notEqual(run("Bash", { command: "acli jira workitem view K-1 $(acli jira workitem delete --key S-1 --yes)" }), "allow");
+  assert.equal(run("Bash", { command: `acli jira workitem comment create --key K-1 --body "$(curl -X DELETE ${url})"` }), "deny");
+  for (const command of [
+    "command acli jira workitem delete --key S-1 --yes",
+    "(acli jira workitem delete --key S-1 --yes)",
+    "env X=1 acli jira workitem delete --key S-1 --yes",
+    'echo S-1 | xargs -I{} acli jira workitem delete --key {} --yes',
+    '"acli" jira workitem delete --key S-1 --yes',
+  ]) {
+    assert.notEqual(run("Bash", { command }), "allow", command);
+  }
+  assert.equal(run("Bash", { command: "acli jira workitem view K-1 --json" }), "allow");
+});
+
+test("every Atlassian host in a command is checked", () => {
+  const cmd = `curl -H "Referer: ${HOME}" -X DELETE https://${WORK}/rest/api/3/issue/S-1`;
+  assert.equal(run("Bash", { command: cmd }), "deny");
+});
+
+test("unknown acli verbs ask, and every --key must be the agent's own", () => {
+  assert.equal(run("Bash", { command: "acli jira project rank --key W" }), "ask");
+  assert.equal(run("Bash", { command: "acli jira project list --json" }), "allow");
+  const created = { [WORK]: ["W-7"] };
+  assert.equal(run("Bash", { command: "acli jira workitem edit --key W-7 --key S-1 --summary x --yes" }, { created }), "ask");
+  assert.equal(run("Bash", { command: "acli jira workitem edit --key W-7,S-1 --summary x --yes" }, { created }), "ask");
+});
+
+test("creates of unknown type are not recorded", () => {
+  const clone = "acli jira workitem clone --key S-1 --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: clone }, tool_response: { stdout: '{"key":"W-60"}' } }), null);
+});

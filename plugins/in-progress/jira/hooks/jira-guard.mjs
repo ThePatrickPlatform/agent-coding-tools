@@ -27,7 +27,11 @@ const PROFILES = ["full", "read-only", "story-content-locked"];
 
 const MCP_WRITES = {
   createJiraIssue: (input) => ({ kind: "create", issueType: input.issueTypeName }),
-  editJiraIssue: (input) => ({ kind: "edit", key: input.issueIdOrKey, fields: Object.keys(input.fields ?? {}) }),
+  editJiraIssue: (input) => ({
+    kind: "edit",
+    keys: input.issueIdOrKey ? [String(input.issueIdOrKey)] : [],
+    fields: Object.keys(input.fields ?? {}),
+  }),
   transitionJiraIssue: () => ({ kind: "transition" }),
   addCommentToJiraIssue: () => ({ kind: "comment" }),
   createIssueLink: () => ({ kind: "link" }),
@@ -52,20 +56,20 @@ const ACLI_NEUTRAL_FLAGS = new Set(["--yes", "-y", "--json", "--key", "-k", "--j
 // Shell checks are best-effort. On a site that is not "full", any command
 // that reaches Atlassian outside acli is denied when it visibly writes and
 // asks otherwise; the guard does not try to prove a REST call only reads.
-const REST_HOST = /([a-z0-9-]+\.atlassian\.net)|api\.atlassian\.com\/ex\/jira\/([\w-]+)/i;
+const REST_HOSTS = /([a-z0-9-]+\.atlassian\.net)|api\.atlassian\.com\/ex\/jira\/([\w-]+)/gi;
 const REST_WRITE =
   /(-X|--request|-Method|--method)[\s=]*['"]?(POST|PUT|PATCH|DELETE)\b|(^|\s)(-d|--data[\w-]*|--json|-F|--form|-T|--upload-file|-Body|-InFile|--post-data|--post-file|--body-data|--body-file)(?=[\s=@'"]|$)/im;
 const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
 // In shell commands, also catch globbed or quoted forms such as ~/.agent-coding-*.
 const GUARD_SHELL = /\.agent-coding|jira-policy|jira-created/i;
 // Command substitution and comments can hide what a command really does.
-const OPAQUE = /`|\$\(|(^|\s)#/;
+const OPAQUE = /`|\$\(|<\(|(^|\s)#/;
 
 // ---- Classify a tool call into Jira write actions -----------------------
 
 export function classify(toolName, toolInput) {
   const input = toolInput ?? {};
-  const name = toolName.toLowerCase();
+  const name = String(toolName ?? "").toLowerCase();
   if (SHELL_TOOLS.has(name)) return classifyShell(String(input.command ?? ""));
   if (FILE_TOOLS.has(name)) {
     const file = String(input.file_path ?? input.path ?? input.notebook_path ?? "");
@@ -83,23 +87,29 @@ export function classify(toolName, toolInput) {
 function classifyShell(command) {
   const actions = [];
   const other = [];
+  let acliSegments = 0;
   for (const segment of command.split(/[;&|\n]+/)) {
     // acli counts only as the command itself, not as words inside another one.
     const acli = segment.match(/^\s*(?:\S*[\\/])?acli(?:\.exe)?\s+jira\s+(.*)/i);
     if (acli) {
       const action = classifyAcli(tokenize(acli[1]));
       if (action) actions.push({ ...action, site: "acli" });
+      acliSegments++;
+    } else if (/\bacli\b/i.test(segment) && /\bjira\b/i.test(segment)) {
+      // acli run indirectly, such as through env, xargs, or quotes.
+      actions.push({ kind: "unknown-write", site: "acli" });
     } else if (segment.trim()) {
       other.push(segment);
     }
   }
+  const opaque = OPAQUE.test(command);
+  if (opaque && acliSegments > 0) actions.push({ kind: "unknown-write", site: "acli" });
   // Judge the whole command, so a URL in one line and a write in the next,
   // or a REST call beside an acli command, are still seen together.
-  const host = command.match(REST_HOST);
-  const onlyAcli = other.length === 0 && actions.length > 0;
-  if (host && !onlyAcli) {
-    const site = host[1] ?? host[2];
-    actions.push({ kind: REST_WRITE.test(command) ? "rest-write" : "rest-unknown", site });
+  const onlyAcli = other.length === 0 && acliSegments > 0 && !opaque;
+  if (!onlyAcli) {
+    const kind = REST_WRITE.test(command) ? "rest-write" : "rest-unknown";
+    for (const host of command.matchAll(REST_HOSTS)) actions.push({ kind, site: host[1] ?? host[2] });
   }
   if (GUARD_SHELL.test(command)) actions.push({ kind: "guard-file" });
   return actions;
@@ -108,13 +118,12 @@ function classifyShell(command) {
 function classifyAcli(tokens) {
   const [group, verb, sub] = tokens;
   const flags = tokens.filter((t) => t.startsWith("-"));
-  const flagValue = (...names) => {
-    const i = tokens.findIndex((t) => names.includes(t));
-    return i >= 0 ? tokens[i + 1] : undefined;
-  };
+  const flagValues = (...names) =>
+    tokens.flatMap((t, i) => (names.includes(t) && tokens[i + 1] ? tokens[i + 1].split(",") : []));
+  const flagValue = (...names) => flagValues(...names)[0];
   if (group === "auth") return verb === "status" ? null : { kind: "acli-auth" };
   if (group !== "workitem") {
-    return verb && !ACLI_READ_VERBS.has(verb) && WRITE_VERB.test(verb) ? { kind: "unknown-write" } : null;
+    return !verb || ACLI_READ_VERBS.has(verb) || ACLI_READ_VERBS.has(sub) ? null : { kind: "unknown-write" };
   }
   switch (verb) {
     case "create":
@@ -125,7 +134,7 @@ function classifyAcli(tokens) {
     case "edit": {
       const fields = flags.filter((f) => !ACLI_NEUTRAL_FLAGS.has(f)).map((f) => ACLI_EDIT_FLAGS[f] ?? "other fields");
       const bulk = flags.includes("--jql") || flags.includes("--filter");
-      return { kind: "edit", key: flagValue("--key", "-k"), fields, bulk };
+      return { kind: "edit", keys: flagValues("--key", "-k"), fields, bulk };
     }
     case "assign":
       return { kind: "assign" };
@@ -213,9 +222,10 @@ export function decide(action, rule, createdKeys) {
       if (action.bulk) return deny(`Bulk edits of ${content.join(", ")} are not allowed on ${where}.`);
       // The created-issue exemption never covers changing the type, which
       // could turn a Task into a locked Story.
-      if (action.key && createdKeys.includes(action.key) && !content.includes("issuetype")) return null;
+      const allCreated = action.keys.length > 0 && action.keys.every((k) => createdKeys.includes(k));
+      if (allCreated && !content.includes("issuetype")) return null;
       return ask(
-        `${action.key ?? "This issue"} may be a ${locked}; their content (${content.join(", ")}) is locked on ${where}. ` +
+        `${action.keys.join(", ") || "This issue"} may be a ${locked}; their content (${content.join(", ")}) is locked on ${where}. ` +
           `Only approve if it is not a ${locked}. Otherwise add a comment proposing the change for the product owner.`,
       );
     }
@@ -263,7 +273,7 @@ export function createdKey(event) {
   const command = String(event.tool_input?.command ?? "");
   if (/[;&|\n]/.test(command) || OPAQUE.test(command)) return null;
   const actions = classify(event.tool_name, event.tool_input);
-  if (actions.length !== 1 || actions[0].kind !== "create") return null;
+  if (actions.length !== 1 || actions[0].kind !== "create" || !actions[0].issueType) return null;
   const response = event.tool_response;
   if (!response || response.isError) return null;
   const candidates = command
@@ -313,8 +323,10 @@ function readAcliSite() {
 }
 
 function readPolicy() {
+  if (!fs.existsSync(POLICY_FILE)) return null;
   try {
-    return readJson(POLICY_FILE);
+    const policy = JSON.parse(fs.readFileSync(POLICY_FILE, "utf8"));
+    return policy && typeof policy === "object" && !Array.isArray(policy) ? policy : { default: "invalid" };
   } catch {
     return { default: "invalid" };
   }
