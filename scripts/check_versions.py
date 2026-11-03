@@ -22,7 +22,15 @@ PREFIXES = {
     "release": "",
 }
 
+IN_PROGRESS = "in-progress"
+
 errors = []
+
+
+def plugin_dirs():
+    """Graduated plugins in plugins/<name>/, in-progress ones in plugins/in-progress/<name>/."""
+    graduated = [d for d in ROOT.glob("plugins/*/") if d.name != IN_PROGRESS]
+    return sorted(graduated + list(ROOT.glob(f"plugins/{IN_PROGRESS}/*/")))
 
 
 def error(path, message):
@@ -80,27 +88,32 @@ def read_skill(text):
 
 def check_plugin(plugin_dir, marketplace):
     name = plugin_dir.name
-    claude_path = plugin_dir / ".claude-plugin" / "plugin.json"
-    codex_path = plugin_dir / ".codex-plugin" / "plugin.json"
-    if not claude_path.exists() or not codex_path.exists():
-        error(plugin_dir.relative_to(ROOT), "needs both .claude-plugin and .codex-plugin manifests")
+    manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
+    if not manifest_path.exists():
+        error(plugin_dir.relative_to(ROOT), "needs a .claude-plugin/plugin.json manifest")
         return
-    claude = json.loads(claude_path.read_text(encoding="utf-8"))
-    codex = json.loads(codex_path.read_text(encoding="utf-8"))
-    rel = claude_path.relative_to(ROOT)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rel = manifest_path.relative_to(ROOT)
 
-    description = claude.get("description", "")
+    description = manifest.get("description", "")
     stage = stage_from_description(description)
-    check_stage(rel, claude.get("version"), stage)
+    check_stage(rel, manifest.get("version"), stage)
 
-    for key in ("name", "version", "description"):
-        if codex.get(key) != claude.get(key):
-            error(codex_path.relative_to(ROOT), f"{key} differs from {rel}")
+    in_progress_folder = plugin_dir.parent.name == IN_PROGRESS
+    if in_progress_folder and stage != "in-progress":
+        error(rel, f"{stage} plugins move out of plugins/{IN_PROGRESS}/ to plugins/{name}/")
+    if not in_progress_folder and stage == "in-progress":
+        error(rel, f"in-progress plugins belong in plugins/{IN_PROGRESS}/{name}/")
+
     entry = marketplace.get(name)
+    source = "./" + plugin_dir.relative_to(ROOT).as_posix()
     if entry is None:
         error(".claude-plugin/marketplace.json", f"no entry for plugin {name}")
-    elif entry.get("description") != description:
-        error(".claude-plugin/marketplace.json", f"description for {name} differs from {rel}")
+    else:
+        if entry.get("description") != description:
+            error(".claude-plugin/marketplace.json", f"description for {name} differs from {rel}")
+        if entry.get("source") != source:
+            error(".claude-plugin/marketplace.json", f"source for {name} must be {source}")
 
     for skill_path in sorted(plugin_dir.glob("skills/*/SKILL.md")):
         skill = read_skill(skill_path.read_text(encoding="utf-8"))
@@ -151,7 +164,7 @@ def check_bumps(base):
         skill = read_skill(text)
         return skill["version"], skill["lifecycle"]
 
-    for plugin_dir in sorted(ROOT.glob("plugins/*/")):
+    for plugin_dir in plugin_dirs():
         folder = plugin_dir.relative_to(ROOT).as_posix()
         require_bump(folder, f"{folder}/.claude-plugin/plugin.json", plugin_metadata)
         for skill_dir in sorted(plugin_dir.glob("skills/*/")):
@@ -165,8 +178,10 @@ def main():
         plugin["name"]: plugin
         for plugin in json.loads(marketplace_path.read_text(encoding="utf-8"))["plugins"]
     }
-    for plugin_dir in sorted(ROOT.glob("plugins/*/")):
+    for plugin_dir in plugin_dirs():
         check_plugin(plugin_dir, marketplace)
+    for name in marketplace.keys() - {d.name for d in plugin_dirs()}:
+        error(".claude-plugin/marketplace.json", f"entry {name} has no plugin folder")
     if "--base" in sys.argv:
         check_bumps(sys.argv[sys.argv.index("--base") + 1])
 

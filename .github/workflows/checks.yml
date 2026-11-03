@@ -20,5 +20,3 @@ jobs:
       - name: Version bumps since main
         if: github.event_name == 'pull_request'
         run: python scripts/check_versions.py --base origin/${{ github.base_ref }}
-      - name: Codex agents up to date
-        run: python scripts/build_codex_agents.py --check

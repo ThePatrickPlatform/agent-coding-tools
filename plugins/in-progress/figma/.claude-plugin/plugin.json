@@ -1,0 +1,7 @@
+{
+  "name": "figma",
+  "version": "0.0.1",
+  "description": "In progress: Read and work with Figma designs using OAuth only, through the Figma MCP server or the REST API.",
+  "author": { "name": "Jeremy Haveard" },
+  "license": "MIT"
+}
