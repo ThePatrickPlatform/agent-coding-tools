@@ -6,7 +6,15 @@ only what you need.
 
 ## Install
 
-Claude Code:
+Follow [SETUP.md](SETUP.md). It walks through prerequisites, sign-in, and the
+Jira site policy, and its script installs a profile of agents the same way on
+every machine:
+
+```
+node setup/setup.mjs --profile engineer
+```
+
+To install a single plugin by hand instead, in Claude Code:
 
 ```
 /plugin marketplace add ThePatrickPlatform/agent-coding-tools
@@ -137,8 +145,12 @@ plugins/
     agents/<name>.agent.md          agent plugins
     skills/<name>/SKILL.md          skill and integration plugins
 scripts/check_versions.py           checks versions, stages, and the catalog
+setup/setup.mjs                     installs and checks a profile on a machine
+setup/profiles.json                 profiles, MCP servers, retired plugins
+setup/jira-policy.example.json      starting point for a Jira site policy
 AGENTS.md                           rules for plugins in this repo
 CONTRIBUTING.md                     how to add a plugin
+SETUP.md                            how to set up a machine
 VERSIONING.md                       versioning and release process
 ```
 
