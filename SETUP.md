@@ -108,6 +108,20 @@ address bar, such as `example-company.atlassian.net`, and pick a profile for eac
 | `story-content-locked` | A site where only the product owner changes approved stories | Read, comment, link, assign, change status, log work, and create and edit Tasks. Not create stories or epics, or change their content. |
 | `read-only` | Any site you only want to look at | Search and read |
 
+For every site that is not `full`, also add its `cloudId`, because agents
+often name a site by its cloud ID rather than its hostname. Open
+`https://<your-site>.atlassian.net/_edge/tenant_info` in your browser and copy
+the `cloudId` value:
+
+```json
+"your-company.atlassian.net": {
+  "profile": "story-content-locked",
+  "cloudId": "<cloudId from tenant_info>"
+}
+```
+
+The cloud ID identifies your site, so this file stays on your machine.
+
 Any site not in the file gets `default`, which is `read-only` in the example.
 Keep the default strict, so a new site is protected until you add it.
 

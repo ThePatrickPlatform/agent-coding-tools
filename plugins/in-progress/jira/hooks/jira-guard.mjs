@@ -26,7 +26,7 @@ const DEFAULT_EDITABLE_FIELDS = ["assignee"];
 const PROFILES = ["full", "read-only", "story-content-locked"];
 
 const MCP_WRITES = {
-  createJiraIssue: (input) => ({ kind: "create", issueType: input.issueTypeName }),
+  createJiraIssue: (input) => ({ kind: "create", issueType: issueType([input.issueTypeName]) }),
   editJiraIssue: (input) => ({
     kind: "edit",
     keys: input.issueIdOrKey ? [String(input.issueIdOrKey)] : [],
@@ -127,7 +127,7 @@ function classifyAcli(tokens) {
   }
   switch (verb) {
     case "create":
-      return { kind: "create", issueType: flags.includes("--from-json") ? undefined : flagValue("--type", "-t") };
+      return { kind: "create", issueType: flags.includes("--from-json") ? undefined : issueType(flagValues("--type", "-t")) };
     case "create-bulk":
     case "clone":
       return { kind: "create", issueType: undefined };
@@ -152,12 +152,21 @@ function classifyAcli(tokens) {
   }
 }
 
+// The one issue type named, or undefined when it is missing, repeated, or
+// not a plain name (such as a numeric type ID).
+function issueType(values) {
+  const names = values.filter((v) => v !== undefined).map((v) => String(v).trim());
+  return names.length === 1 && /[a-z]/i.test(names[0]) ? names[0] : undefined;
+}
+
 function tokenize(text) {
-  return [...text.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  return [...text.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)]
+    .map((m) => m[1] ?? m[2] ?? m[3])
+    .flatMap((t) => t.match(/^(--?[\w-]+)=(.*)$/s)?.slice(1) ?? [t]);
 }
 
 export function siteId(site) {
-  return String(site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  return String(site ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/\.+$/, "");
 }
 
 // ---- Decide -------------------------------------------------------------
@@ -185,6 +194,7 @@ export function siteRule(policy, site) {
   const valid = resolved && typeof resolved === "object" && lockedTypes && editableFields;
   return {
     host: host ?? (id || "an unidentified site"),
+    unlisted: rule === undefined,
     profile: valid ? resolved.profile : "invalid",
     lockedTypes: (lockedTypes ?? []).map((t) => t.toLowerCase()),
     editableFields: editableFields ?? [],
@@ -196,7 +206,13 @@ export function decide(action, rule, createdKeys) {
   if (!PROFILES.includes(rule.profile)) {
     return deny(`The Jira policy for ${rule.host} is invalid ("${rule.profile}"). Fix ${POLICY_FILE}.`);
   }
-  if (rule.profile === "full") return null;
+  if (rule.profile === "full") {
+    // A site may be named by its cloud ID, which a policy listing only its
+    // hostname cannot match. Do not let a permissive default cover it.
+    return rule.unlisted
+      ? ask(`${rule.host} is not listed in ${POLICY_FILE}, so its rules are unknown. Approve only if this is a site you may change freely, and add it to the policy (with its cloudId).`)
+      : null;
+  }
   if (rule.profile === "read-only") {
     return deny(`Jira site ${where} is read-only. Do not retry. Tell the user what you would have changed.`);
   }
@@ -272,6 +288,7 @@ export function evaluate(event, { policy, acliSite, createdKeys }) {
 export function createdKey(event) {
   const command = String(event.tool_input?.command ?? "");
   if (/[;&|\n]/.test(command) || OPAQUE.test(command)) return null;
+  if (command && !/^\s*acli(?:\.exe)?\s/i.test(command)) return null;
   const actions = classify(event.tool_name, event.tool_input);
   if (actions.length !== 1 || actions[0].kind !== "create" || !actions[0].issueType) return null;
   const response = event.tool_response;

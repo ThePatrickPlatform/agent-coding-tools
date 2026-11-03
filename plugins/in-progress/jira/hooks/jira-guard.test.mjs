@@ -262,3 +262,32 @@ test("creates of unknown type are not recorded", () => {
   const clone = "acli jira workitem clone --key S-1 --json";
   assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: clone }, tool_response: { stdout: '{"key":"W-60"}' } }), null);
 });
+
+test("unlisted sites ask when the default is full", () => {
+  const fullDefault = { default: "full", sites: { [WORK]: { profile: "story-content-locked" } } };
+  const story = { issueTypeName: "Story" };
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: "0b1c2d3e-uuid", ...story }, { withPolicy: fullDefault }), "ask");
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: `${WORK}.`, ...story }, { withPolicy: fullDefault }), "deny");
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: HOME, ...story }), "allow");
+});
+
+test("repeated, inline, or odd issue types need approval", () => {
+  for (const command of [
+    "acli jira workitem create --project W --type Task --type Story --summary x",
+    "acli jira workitem create --project W --type=Story --summary x",
+    "acli jira workitem create --project W -t Task -t Story --summary x",
+  ]) {
+    assert.notEqual(run("Bash", { command }), "allow", command);
+  }
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "Story " }), "deny");
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "10001" }), "ask");
+  assert.equal(run("Bash", { command: 'acli jira workitem edit --key W-1 --summary="x" --yes' }), "ask");
+});
+
+test("only a real acli command records a created issue", () => {
+  const response = { stdout: '{"key":"W-61"}' };
+  const fake = "./acli jira workitem create --project W --type Task --summary x --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: fake }, tool_response: response }), null);
+  const real = "acli jira workitem create --project W --type Task --summary x --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: real }, tool_response: response }), "W-61");
+});
