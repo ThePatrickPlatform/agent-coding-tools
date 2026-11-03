@@ -17,8 +17,9 @@ machine ends up configured the same way.
 You need at least one of Claude Code and Copilot CLI. The script sets up
 whichever are installed.
 
-Node.js must stay on your `PATH`. The `jira` plugin's safety check runs on it,
-and if Node.js is missing, Copilot CLI blocks every shell command.
+Node.js must stay on your `PATH`. The `jira` plugin's safety check runs on it.
+If Node.js is missing, Copilot CLI blocks every shell command, and Claude Code
+skips the check, so your Jira site policy is **not enforced** there.
 
 ## 2. Clone this repo
 
@@ -99,7 +100,7 @@ Copy-Item setup\jira-policy.example.json "$HOME\.agent-coding-tools\jira-policy.
 ```
 
 Edit the file. Replace each example site with the hostname from your Jira
-address bar, such as `company.atlassian.net`, and pick a profile for each:
+address bar, such as `example-company.atlassian.net`, and pick a profile for each:
 
 | Profile | Use it for | Agents can |
 | --- | --- | --- |
@@ -156,6 +157,7 @@ It only changes what differs, so it is safe to run as often as you like.
 | Agents don't appear | Restart the tool, or run `/reload-plugins` in Claude Code. |
 | Jira or Figma tools are missing | Sign in to the MCP server (step 4). |
 | Every shell command is blocked in Copilot CLI | Node.js is not on your `PATH`. Install it, or uninstall the `jira` plugin. |
+| The Jira policy is ignored in Claude Code | Node.js is not on your `PATH`, so the check cannot run. Install it and restart Claude Code. |
 | A Jira change you expected to work is blocked | Check the site's profile in `~/.agent-coding-tools/jira-policy.json`. The block message names the site and profile. |
 | `story-content-locked` asks before editing a Task | The agent cannot tell whether the issue is a story. Approve it if it is not a story or epic. |
 | `acli` changes use the wrong rules | The policy follows the site `acli` is signed in to. Run `acli jira auth status`, and `acli jira auth switch --site <site>` if needed. |

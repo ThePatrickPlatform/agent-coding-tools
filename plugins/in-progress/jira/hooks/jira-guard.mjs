@@ -1,11 +1,12 @@
 // Enforces the Jira site policy for Claude Code and GitHub Copilot CLI.
 //
-// Runs as a PreToolUse hook on Jira MCP tools and shell commands, and as a
-// PostToolUse hook to remember issues the agent created. Both tools send the
-// same payload and accept the same decision output for plugin hooks.
+// Runs as a PreToolUse hook on Jira MCP tools, shell commands, and file
+// edits, and as a PostToolUse hook to remember issues the agent created. Both
+// tools send the same payload and accept the same decision output for plugin
+// hooks. Any error denies the call rather than letting it through.
 //
 // The policy file maps each Jira site to a profile. Without a policy file,
-// nothing is restricted. See skills/jira/references/site-policy.md.
+// Jira calls are not restricted. See skills/jira/references/site-policy.md.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -15,6 +16,10 @@ import { pathToFileURL } from "node:url";
 
 export const POLICY_FILE =
   process.env.JIRA_POLICY_FILE ?? path.join(os.homedir(), ".agent-coding-tools", "jira-policy.json");
+const CREATED_FILE = path.join(
+  process.env.CLAUDE_PLUGIN_DATA ?? path.join(os.homedir(), ".agent-coding-tools"),
+  "jira-created-issues.json",
+);
 
 const DEFAULT_LOCKED_TYPES = ["Story", "Epic"];
 const DEFAULT_EDITABLE_FIELDS = ["assignee"];
@@ -28,7 +33,10 @@ const MCP_WRITES = {
   createIssueLink: () => ({ kind: "link" }),
   addWorklogToJiraIssue: () => ({ kind: "worklog" }),
 };
+const JIRA_TOOL = /Jira|IssueLink|Worklog/;
+const READ_TOOL = /^(get|search|lookup|list|fetch)/i;
 const WRITE_VERB = /^(create|edit|update|delete|remove|add|transition|assign|move|archive)/i;
+const FILE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 const ACLI_READ_VERBS = new Set(["view", "search", "list", "type", "status", "get", "count", "help"]);
 const ACLI_EDIT_FLAGS = {
@@ -40,33 +48,52 @@ const ACLI_EDIT_FLAGS = {
 };
 const ACLI_NEUTRAL_FLAGS = new Set(["--yes", "-y", "--json", "--key", "-k", "--jql", "--filter", "--help", "-h"]);
 
+// Shell checks are best-effort: they catch common HTTP clients, and ask
+// whenever a command reaches Atlassian in a way they cannot read.
 const REST_HOST = /([a-z0-9-]+\.atlassian\.net)|api\.atlassian\.com\/ex\/jira\/([\w-]+)/i;
-const REST_WRITE = /(-X|--request|-Method)\s*['"]?(POST|PUT|PATCH|DELETE)\b|\s(-d|--data[\w-]*|--json|-F|--form|-Body)\s/i;
+const REST_WRITE =
+  /(-X|--request|-Method|--method)[\s=]*['"]?(POST|PUT|PATCH|DELETE)\b|(^|\s)(-d|--data[\w-]*|--json|-F|--form|-T|--upload-file|-Body|-InFile|--post-data|--post-file|--body-data|--body-file)(?=[\s=@'"]|$)/im;
+const REST_READ_SEGMENT = /^\s*(curl|wget|Invoke-RestMethod|Invoke-WebRequest|irm|iwr|\$?\w+\s*=)(\s|$)/i;
+const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
 
-// ---- Classify a tool call into a Jira write action, or null -------------
+// ---- Classify a tool call into Jira write actions -----------------------
 
 export function classify(toolName, toolInput) {
-  if (toolName === "Bash" || toolName === "PowerShell") return classifyShell(String(toolInput?.command ?? ""));
-  const tool = toolName.split(/__|-/).pop();
   const input = toolInput ?? {};
+  if (toolName === "Bash" || toolName === "PowerShell") return classifyShell(String(input.command ?? ""));
+  if (FILE_TOOLS.has(toolName)) {
+    const file = String(input.file_path ?? input.notebook_path ?? "");
+    return GUARD_FILES.test(file) || path.resolve(file) === CREATED_FILE ? [{ kind: "guard-file" }] : [];
+  }
+  const tool = toolName.split(/__|-/).pop();
   const site = input.cloudId;
   if (MCP_WRITES[tool]) return [{ ...MCP_WRITES[tool](input), site }];
-  if (/Jira|IssueLink/.test(tool) && WRITE_VERB.test(tool)) return [{ kind: "unknown-write", site }];
+  if (JIRA_TOOL.test(tool) && !READ_TOOL.test(tool)) return [{ kind: "unknown-write", site }];
   return [];
 }
 
 function classifyShell(command) {
   const actions = [];
+  const other = [];
   for (const segment of command.split(/[;&|\n]+/)) {
     const acli = segment.match(/\bacli(?:\.exe)?\s+jira\s+(.*)/i);
     if (acli) {
       const action = classifyAcli(tokenize(acli[1]));
       if (action) actions.push({ ...action, site: "acli" });
-    } else if (REST_HOST.test(segment) && REST_WRITE.test(segment)) {
-      const [, host, cloudId] = segment.match(REST_HOST);
-      actions.push({ kind: "rest-write", site: host ?? cloudId });
+    } else if (segment.trim()) {
+      other.push(segment);
     }
   }
+  // Judge the rest as a whole, so a URL in one line and a write in the next
+  // are still seen together.
+  const rest = other.join("\n");
+  const host = rest.match(REST_HOST);
+  if (host) {
+    const site = host[1] ?? host[2];
+    if (REST_WRITE.test(rest)) actions.push({ kind: "rest-write", site });
+    else if (!other.every((segment) => REST_READ_SEGMENT.test(segment))) actions.push({ kind: "rest-unknown", site });
+  }
+  if (GUARD_FILES.test(command)) actions.push({ kind: "guard-file" });
   return actions;
 }
 
@@ -111,29 +138,45 @@ function tokenize(text) {
   return [...text.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
 }
 
+export function siteId(site) {
+  return String(site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+}
+
 // ---- Decide -------------------------------------------------------------
 
+const INVALID = { profile: "invalid" };
+
+function stringList(value, fallback) {
+  if (value === undefined) return fallback;
+  return Array.isArray(value) && value.every((v) => typeof v === "string") ? value : null;
+}
+
 export function siteRule(policy, site) {
-  const id = String(site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const id = siteId(site);
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) return { ...INVALID, host: id };
+  const sites = Object.entries(policy.sites ?? {});
   const [host, rule] =
     (id &&
-      Object.entries(policy.sites ?? {}).find(
-        ([host, rule]) => host.toLowerCase() === id || String(rule.cloudId ?? "").toLowerCase() === id,
+      sites.find(
+        ([host, rule]) => host.toLowerCase() === id || String(rule?.cloudId ?? "").toLowerCase() === id,
       )) ||
     [];
-  const resolved = rule ?? { profile: policy.default ?? "read-only" };
+  const resolved = rule === undefined ? { profile: policy.default ?? "read-only" } : rule;
+  const lockedTypes = stringList(resolved?.lockedTypes, DEFAULT_LOCKED_TYPES);
+  const editableFields = stringList(resolved?.editableFields, DEFAULT_EDITABLE_FIELDS);
+  const valid = resolved && typeof resolved === "object" && lockedTypes && editableFields;
   return {
     host: host ?? (id || "an unidentified site"),
-    profile: resolved.profile,
-    lockedTypes: (resolved.lockedTypes ?? DEFAULT_LOCKED_TYPES).map((t) => t.toLowerCase()),
-    editableFields: resolved.editableFields ?? DEFAULT_EDITABLE_FIELDS,
+    profile: valid ? resolved.profile : "invalid",
+    lockedTypes: (lockedTypes ?? []).map((t) => t.toLowerCase()),
+    editableFields: editableFields ?? [],
   };
 }
 
 export function decide(action, rule, createdKeys) {
   const where = `${rule.host} (${rule.profile} in ${POLICY_FILE})`;
   if (!PROFILES.includes(rule.profile)) {
-    return deny(`Unknown Jira policy profile "${rule.profile}" for ${rule.host}. Fix ${POLICY_FILE}.`);
+    return deny(`The Jira policy for ${rule.host} is invalid ("${rule.profile}"). Fix ${POLICY_FILE}.`);
   }
   if (rule.profile === "full") return null;
   if (rule.profile === "read-only") {
@@ -169,6 +212,8 @@ export function decide(action, rule, createdKeys) {
       return deny(`Deleting or archiving issues is not allowed on ${where}.`);
     case "rest-write":
       return deny(`Writes through the REST API are not allowed on ${where}. Use the Atlassian MCP server or acli.`);
+    case "rest-unknown":
+      return ask(`This command reaches ${where} and may change it. Approve only if it only reads.`);
     default:
       return ask(`This Jira change on ${where} is not covered by the policy. Approve only if it does not change ${locked} content.`);
   }
@@ -184,31 +229,43 @@ function ask(reason) {
 
 // Returns the strictest decision for a tool call, or null to allow it.
 export function evaluate(event, { policy, acliSite, createdKeys }) {
-  if (!policy) return null;
   const decisions = classify(event.tool_name, event.tool_input).map((action) => {
+    if (action.kind === "guard-file") {
+      return ask(`This changes or reads the Jira policy guard's files. Only the user should change the Jira policy; approve only if you asked for this.`);
+    }
+    if (policy === null) return null;
     const site = action.site === "acli" ? acliSite() : action.site;
-    return decide(action, siteRule(policy, site), createdKeys());
+    return decide(action, siteRule(policy, site), createdKeys(site));
   });
   return decisions.find((d) => d?.permissionDecision === "deny") ?? decisions.find(Boolean) ?? null;
 }
 
 // ---- Remember issues the agent created ----------------------------------
 
+// Returns the key from a successful, standalone create, or null.
 export function createdKey(event) {
-  const isCreate = classify(event.tool_name, event.tool_input).some((a) => a.kind === "create");
-  if (!isCreate) return null;
-  const text = JSON.stringify(event.tool_response ?? "");
-  const match = text.match(/\\*"key\\*"\s*:\s*\\*"([A-Z][A-Z0-9_]*-\d+)/) ?? text.match(/\b([A-Z][A-Z0-9_]*-\d+)\b/);
-  return match?.[1] ?? null;
-}
-
-function createdStore() {
-  const dir = process.env.CLAUDE_PLUGIN_DATA ?? path.join(os.homedir(), ".agent-coding-tools");
-  return path.join(dir, "jira-created-issues.json");
+  const command = String(event.tool_input?.command ?? "");
+  if (/[;&|\n]/.test(command)) return null;
+  const actions = classify(event.tool_name, event.tool_input);
+  if (actions.length !== 1 || actions[0].kind !== "create") return null;
+  const response = event.tool_response ?? {};
+  const text = JSON.stringify(response);
+  if (response.isError || /\\*"isError\\*"\s*:\s*true/.test(text)) return null;
+  return text.match(/\\*"key\\*"\s*:\s*\\*"([A-Z][A-Z0-9_]*-\d+)\\*"/)?.[1] ?? null;
 }
 
 function readJson(file) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+}
+
+// A missing or damaged store only means more questions, never fewer.
+function readCreated() {
+  try {
+    const store = readJson(CREATED_FILE);
+    return store && typeof store === "object" && !Array.isArray(store) ? store : {};
+  } catch {
+    return {};
+  }
 }
 
 function readAcliSite() {
@@ -220,37 +277,50 @@ function readAcliSite() {
   }
 }
 
-function main(event) {
-  if (event.hook_event_name === "PostToolUse") {
-    const key = createdKey(event);
-    if (key) {
-      const file = createdStore();
-      const created = readJson(file) ?? [];
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, JSON.stringify([...new Set([...created, key])].slice(-500)));
-    }
-    return null;
-  }
-
-  let policy;
+function readPolicy() {
   try {
-    policy = readJson(POLICY_FILE);
+    return readJson(POLICY_FILE);
   } catch {
-    policy = { default: "invalid", sites: {} };
+    return { default: "invalid" };
   }
-  let site;
-  return evaluate(event, {
-    policy,
-    acliSite: () => (site ??= readAcliSite()),
-    createdKeys: () => readJson(createdStore()) ?? [],
-  });
+}
+
+export function handle(inputText) {
+  let event;
+  try {
+    event = JSON.parse(inputText);
+    let site;
+    const acliSite = () => (site ??= readAcliSite());
+
+    if (event.hook_event_name === "PostToolUse") {
+      const key = createdKey(event);
+      if (key) {
+        const id = siteId(event.tool_input?.command ? acliSite() : event.tool_input?.cloudId);
+        const store = readCreated();
+        store[id] = [...new Set([...(store[id] ?? []), key])].slice(-500);
+        fs.mkdirSync(path.dirname(CREATED_FILE), { recursive: true });
+        fs.writeFileSync(CREATED_FILE, JSON.stringify(store));
+      }
+      return null;
+    }
+
+    const created = readCreated();
+    return evaluate(event, {
+      policy: readPolicy(),
+      acliSite,
+      createdKeys: (s) => created[siteId(s)] ?? [],
+    });
+  } catch (err) {
+    if (event?.hook_event_name === "PostToolUse") return null;
+    return deny(`The Jira policy guard failed (${err.message}), so this call was blocked. Fix the problem or tell the user.`);
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   let input = "";
   process.stdin.on("data", (chunk) => (input += chunk));
   process.stdin.on("end", () => {
-    const decision = main(JSON.parse(input));
+    const decision = handle(input);
     if (decision) {
       process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", ...decision } }));
     }

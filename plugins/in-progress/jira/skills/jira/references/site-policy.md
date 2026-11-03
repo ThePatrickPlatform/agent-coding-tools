@@ -12,8 +12,8 @@ policy file; never create or edit it for them unless they ask.
 {
   "default": "read-only",
   "sites": {
-    "home.atlassian.net": { "profile": "full" },
-    "company.atlassian.net": {
+    "example-home.atlassian.net": { "profile": "full" },
+    "example-company.atlassian.net": {
       "profile": "story-content-locked",
       "lockedTypes": ["Story", "Epic"],
       "editableFields": ["assignee", "labels"]
@@ -62,7 +62,14 @@ The plugin's hook checks every Jira MCP call and every `acli` or REST command
 against the policy before it runs, in both Claude Code and Copilot CLI. It
 blocks changes the policy does not allow. When it cannot tell whether an issue
 is a locked type, it asks the user to confirm. It remembers issues the agent
-created so it can allow editing them.
+created on each site, from standalone create calls only, so it can allow
+editing them. If the hook itself fails, for example because the policy file is
+malformed, it blocks the call.
 
-The hook is a safety net. Jira's own permissions are the real authority, and
-the hook cannot see writes made by other programs.
+It also asks before any tool changes the policy file or the hook's list of
+created issues, so an agent cannot loosen its own limits.
+
+Shell checks are best-effort. The hook recognises common HTTP clients and
+blocks writes it can see; when a command reaches an Atlassian site in a way it
+cannot read, such as a script, it asks the user. Jira's own permissions are
+the real authority, and the hook cannot see writes made by other programs.

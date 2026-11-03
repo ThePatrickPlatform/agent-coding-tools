@@ -99,8 +99,8 @@ full access and lock story content at work:
 {
   "default": "read-only",
   "sites": {
-    "home.atlassian.net": { "profile": "full" },
-    "company.atlassian.net": {
+    "example-home.atlassian.net": { "profile": "full" },
+    "example-company.atlassian.net": {
       "profile": "story-content-locked",
       "lockedTypes": ["Story", "Epic"],
       "editableFields": ["assignee"]
