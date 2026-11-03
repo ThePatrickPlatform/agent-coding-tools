@@ -24,6 +24,8 @@ PREFIXES = {
 
 IN_PROGRESS = "in-progress"
 
+CATEGORIES = ("agent", "skill", "integration")
+
 errors = []
 
 
@@ -114,6 +116,8 @@ def check_plugin(plugin_dir, marketplace):
             error(".claude-plugin/marketplace.json", f"description for {name} differs from {rel}")
         if entry.get("source") != source:
             error(".claude-plugin/marketplace.json", f"source for {name} must be {source}")
+        if entry.get("category") not in CATEGORIES:
+            error(".claude-plugin/marketplace.json", f"category for {name} must be one of {', '.join(CATEGORIES)}")
 
     for skill_path in sorted(plugin_dir.glob("skills/*/SKILL.md")):
         skill = read_skill(skill_path.read_text(encoding="utf-8"))

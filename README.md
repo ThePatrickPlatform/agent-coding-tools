@@ -1,43 +1,58 @@
 # agent-coding-tools
 
-A plugin marketplace for Claude Code and GitHub Copilot CLI. Both tools read the
-same files in this repo.
+The company's plugin marketplace for Claude Code and GitHub Copilot CLI. Both
+tools read the same files in this repo. Each plugin does one thing, so install
+only what you need.
 
 ## Install
 
 Claude Code:
 
 ```
-/plugin install dev-team --marketplace ThePatrickPlatform/agent-coding-tools
+/plugin marketplace add ThePatrickPlatform/agent-coding-tools
+/plugin install <plugin>@agent-coding-tools
 ```
 
 GitHub Copilot CLI:
 
 ```
 copilot plugin marketplace add ThePatrickPlatform/agent-coding-tools
-copilot plugin install dev-team@agent-coding-tools
+copilot plugin install <plugin>@agent-coding-tools
 ```
+
+In Claude Code, installing an agent also installs the plugins it depends on.
+In Copilot CLI, install them yourself.
 
 ## Plugins
 
 Each plugin has its own version and stage (`in-progress`, `alpha`, `beta`, or
-`release`). In-progress plugins live in `plugins/in-progress/` and move up to
-`plugins/` when promoted. See [Versioning and releases](VERSIONING.md). Normal installs follow
+`release`). See [Versioning and releases](VERSIONING.md). Normal installs follow
 the default branch, including work in progress.
+
+### Agents
+
+| Plugin | Stage | Version | Uses | Use it to |
+| --- | --- | --- | --- | --- |
+| [`product-owner`](plugins/in-progress/product-owner) | in-progress | 0.0.1 | jira, figma | Turn an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope. |
+| [`ux-designer`](plugins/in-progress/ux-designer) | in-progress | 0.0.1 | figma | Design flows, screens, interaction states, and copy, or review an interface for usability and accessibility. |
+| [`architect`](plugins/in-progress/architect) | in-progress | 0.0.1 | | Decide structure, boundaries, data model, and technology, with trade-offs and implementation steps. |
+| [`software-engineer`](plugins/in-progress/software-engineer) | in-progress | 0.0.1 | jira | Implement features, fix bugs, and refactor, following existing conventions. |
+| [`qa-engineer`](plugins/in-progress/qa-engineer) | in-progress | 0.0.1 | | Write test plans, find edge cases, verify changes, and write bug reports. |
+
+### Skills
+
+None yet. See [Contributing](CONTRIBUTING.md) to add one.
+
+### Integrations
 
 | Plugin | Stage | Version | Description |
 | --- | --- | --- | --- |
-| [`dev-team`](plugins/in-progress/dev-team) | in-progress | 0.0.2 | Five role agents for a software team. |
-| [`jira`](plugins/in-progress/jira) | in-progress | 0.0.1 | A skill for Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
-| [`figma`](plugins/in-progress/figma) | in-progress | 0.0.1 | A skill for Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
+| [`jira`](plugins/in-progress/jira) | in-progress | 0.0.1 | Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
+| [`figma`](plugins/in-progress/figma) | in-progress | 0.0.1 | Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
 
-Install `jira` and `figma` the same way as `dev-team`, replacing the plugin
-name.
+## How agents use skills
 
-## Shared skills
-
-Skills live in their own plugins so any agent, or you directly, can use them.
-Each agent's instructions name the skills it uses and what it uses them for:
+Each agent's instructions name the skills it uses and what for:
 
 | Agent | jira | figma |
 | --- | --- | --- |
@@ -45,17 +60,17 @@ Each agent's instructions name the skills it uses and what it uses them for:
 | `ux-designer` | | Read designs and tokens; comment; edit frames |
 | `software-engineer` | Read issues; update status; comment with PR links | |
 
-To give an agent a skill, add it to that agent's Skills section.
-
-In Claude Code, installing `dev-team` also installs `jira` and `figma`. In
-Copilot CLI, install them separately.
-
 This is guidance, not a lock. Neither tool can limit a skill to specific
-agents, so any agent can still use any installed skill if asked.
+agents, so any agent can use any installed skill if asked.
 
-### jira skill
+## Integration setup
 
-The skill only signs in through OAuth. It never uses API tokens or passwords.
+Integrations sign in through OAuth only. They never use API tokens, personal
+access tokens, or passwords. They read without asking, but show every change
+and wait for your approval before writing.
+
+### jira
+
 Set up at least one of these:
 
 - **MCP:** connect the Atlassian MCP server in your agent and sign in through
@@ -66,12 +81,8 @@ Set up at least one of these:
   access token as `JIRA_ACCESS_TOKEN`. See
   `plugins/in-progress/jira/skills/jira/references/rest-api.md`.
 
-It searches and reads without asking, but shows every change and waits for
-your approval before writing to Jira.
+### figma
 
-### figma skill
-
-The skill only signs in through OAuth. It never uses personal access tokens.
 Set up at least one of these:
 
 - **MCP:** add the remote Figma MCP server, `https://mcp.figma.com/mcp`, and
@@ -83,34 +94,24 @@ Set up at least one of these:
   canvas. See `plugins/in-progress/figma/skills/figma/references/rest-api.md`.
 
 Editing the canvas needs a Full seat, and the MCP server limits calls by seat
-and plan. The skill reads without asking, but shows every comment or change and
-waits for your approval.
-
-### dev-team agents
-
-| Agent | Use it to |
-| --- | --- |
-| `product-owner` | Turn an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope. |
-| `ux-designer` | Design flows, screens, interaction states, and copy, or review an interface for usability and accessibility. |
-| `architect` | Decide structure, boundaries, data model, and technology, with trade-offs and implementation steps. |
-| `software-engineer` | Implement features, fix bugs, and refactor, following existing conventions. |
-| `qa-engineer` | Write test plans, find edge cases, verify changes, and write bug reports. |
+and plan.
 
 ## Layout
 
 ```
-.claude-plugin/marketplace.json     (catalog for Claude Code and Copilot CLI)
+.claude-plugin/marketplace.json     catalog for Claude Code and Copilot CLI
 plugins/
-  in-progress/                      (plugins still taking shape)
-    <plugin-name>/
-  <plugin-name>/                    (graduated: alpha, beta, release)
-    .claude-plugin/plugin.json      (manifest)
-    agents/<name>.agent.md          (agents, if the plugin has any)
-    skills/<name>/SKILL.md          (skills, if the plugin has any)
-scripts/check_versions.py           (checks versions and stages)
-VERSIONING.md                       (versioning and release process)
+  in-progress/<name>/               plugins still taking shape
+  <name>/                           graduated: alpha, beta, release
+    .claude-plugin/plugin.json      manifest
+    agents/<name>.agent.md          agent plugins
+    skills/<name>/SKILL.md          skill and integration plugins
+scripts/check_versions.py           checks versions, stages, and the catalog
+AGENTS.md                           rules for plugins in this repo
+CONTRIBUTING.md                     how to add a plugin
+VERSIONING.md                       versioning and release process
 ```
 
-Agent files use the `.agent.md` extension, which Copilot CLI requires and Claude
-Code accepts. They set no `tools` list, because each tool names its tools
-differently; each agent inherits the tools available in the session.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
