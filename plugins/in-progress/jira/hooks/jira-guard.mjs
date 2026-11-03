@@ -153,16 +153,29 @@ function classifyAcli(tokens) {
 }
 
 // The one issue type named, or undefined when it is missing, repeated, or
-// not a plain name (such as a numeric type ID).
+// not a plain name: a numeric type ID, or anything with quotes, escapes,
+// variables, or unusual characters that could hide a locked type.
 function issueType(values) {
   const names = values.filter((v) => v !== undefined).map((v) => String(v).trim());
-  return names.length === 1 && /[a-z]/i.test(names[0]) ? names[0] : undefined;
+  const plain = names.length === 1 && /^[A-Za-z0-9 _-]+$/.test(names[0]) && /[a-z]/i.test(names[0]);
+  return plain ? names[0] : undefined;
 }
 
+// Splits text into words the way a shell does, joining quoted and unquoted
+// parts of one word (--type="Story" is --type=Story), then splits --flag=value.
 function tokenize(text) {
-  return [...text.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)]
-    .map((m) => m[1] ?? m[2] ?? m[3])
-    .flatMap((t) => t.match(/^(--?[\w-]+)=(.*)$/s)?.slice(1) ?? [t]);
+  const words = [];
+  let word = null;
+  for (const m of text.matchAll(/"([^"]*)"|'([^']*)'|(\s+)|([^\s"']+)/g)) {
+    if (m[3] !== undefined) {
+      if (word !== null) words.push(word);
+      word = null;
+    } else {
+      word = (word ?? "") + (m[1] ?? m[2] ?? m[4]);
+    }
+  }
+  if (word !== null) words.push(word);
+  return words.flatMap((t) => t.match(/^(--?[\w-]+)=(.*)$/s)?.slice(1) ?? [t]);
 }
 
 export function siteId(site) {

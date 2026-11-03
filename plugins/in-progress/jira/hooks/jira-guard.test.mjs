@@ -291,3 +291,15 @@ test("only a real acli command records a created issue", () => {
   const real = "acli jira workitem create --project W --type Task --summary x --json";
   assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: real }, tool_response: response }), "W-61");
 });
+
+test("quoted issue types are read the way the shell reads them", () => {
+  for (const type of ['--type="Story"', "--type='Story'", '--type=St"o"ry', '--type "Story"', "--type=Story "]) {
+    const command = `acli jira workitem create --project W ${type} --summary x`;
+    assert.equal(run("Bash", { command }), "deny", type);
+  }
+  for (const type of [String.raw`--type=St\ory`, "--type=$T", "--type=Sto​ry"]) {
+    const command = `acli jira workitem create --project W ${type} --summary x`;
+    assert.equal(run("Bash", { command }), "ask", type);
+  }
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "Sto​ry" }), "ask");
+});
