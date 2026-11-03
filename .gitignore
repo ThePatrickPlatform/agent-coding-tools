@@ -3,6 +3,7 @@
 jira-policy.json
 !setup/jira-policy.example.json
 jira-created-issues.json
+*.log
 .agent-coding-tools/
 .env
 .env.*

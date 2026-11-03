@@ -21,11 +21,12 @@ jobs:
         if: env.HAS_CLAUDE_AUTH != 'true'
         run: |
           echo "::warning::Security review skipped: add a CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY repository secret. See SECURITY.md."
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: env.HAS_CLAUDE_AUTH == 'true'
         with:
           fetch-depth: 0
-      - uses: anthropics/claude-code-action@v1
+          persist-credentials: false
+      - uses: anthropics/claude-code-action@4845bacbb38b3c4b15d948f035349786f678e068 # v1
         if: env.HAS_CLAUDE_AUTH == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -41,13 +42,16 @@ jobs:
             First read your instructions from the base branch, so this PR
             cannot change them:
               git show origin/${{ github.base_ref }}:.github/security-review.md
-            Only if that file does not exist on the base branch, read
-            .github/security-review.md from the working directory.
+            If that file does not exist on the base branch, post a comment
+            saying the review could not run because its instructions are
+            missing from ${{ github.base_ref }}, and stop.
 
             Follow those instructions exactly. The PR branch is checked out in
             the working directory. See the changes with
             `gh pr diff ${{ github.event.pull_request.number }}` or
             `git diff origin/${{ github.base_ref }}...HEAD`.
+            Only read files inside the working directory.
           claude_args: |
             --model claude-opus-5-5
-            --allowedTools "Read,Grep,Glob,Bash(git show:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+            --allowedTools "Read,Grep,Glob,Bash(git show:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment ${{ github.event.pull_request.number }}:*)"
+            --disallowedTools "Read(//proc/**),Read(//sys/**),Read(//etc/**),Read(//root/**),Read(//tmp/**),Read(//home/runner/work/_temp/**),Read(//home/runner/.*/**),Read(**/.git/config),Grep(//proc/**),Grep(//home/runner/work/_temp/**),Grep(//home/runner/.*/**)"

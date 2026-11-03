@@ -16,9 +16,17 @@ them.
 | GitHub secret scanning | GitHub scans pushes for known token formats, and push protection rejects a push that contains one. | Yes, at push time |
 
 The security review reads its instructions from `main`, not from the pull
-request, so a change cannot weaken its own review. It only runs on pull
-requests from branches in this repository; pull requests from forks get no
-secrets and are not reviewed automatically.
+request, so a change to `.github/security-review.md` only takes effect after
+it is merged. The workflow file itself still runs from the pull request
+branch, so a pull request could change how the review runs or remove it.
+Only people who can push branches here can do that, but read every change
+under `.github/` yourself rather than relying on the review.
+
+The review only runs on pull requests from branches in this repository; pull
+requests from forks get no secrets and are not reviewed automatically. To
+limit what a prompt injection could reach, the reviewer can only read the
+repository and post on its own pull request, checkout does not keep the Git
+token, and every action is pinned to a commit SHA.
 
 ### Set up the security review
 
