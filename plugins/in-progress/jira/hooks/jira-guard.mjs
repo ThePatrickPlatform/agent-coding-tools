@@ -62,8 +62,9 @@ const REST_WRITE =
 const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
 // In shell commands, also catch globbed or quoted forms such as ~/.agent-coding-*.
 const GUARD_SHELL = /\.agent-coding|jira-policy|jira-created/i;
-// Command substitution and comments can hide what a command really does.
-const OPAQUE = /`|\$\(|<\(|(^|\s)#/;
+// Command substitution, comments, backslash escapes, and $'...' quoting can
+// hide what a command really does.
+const OPAQUE = /`|\$\(|<\(|(^|\s)#|\\|\$['"]/;
 
 // ---- Classify a tool call into Jira write actions -----------------------
 

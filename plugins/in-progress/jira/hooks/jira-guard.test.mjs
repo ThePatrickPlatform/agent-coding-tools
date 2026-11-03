@@ -303,3 +303,11 @@ test("quoted issue types are read the way the shell reads them", () => {
   }
   assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "Sto​ry" }), "ask");
 });
+
+test("escaped or ANSI-quoted flag names ask", () => {
+  for (const flag of [String.raw`-\t`, String.raw`--ty\pe`, "$'-t'"]) {
+    const command = `acli jira workitem create --project W --type Task ${flag} Story --summary x`;
+    assert.equal(run("Bash", { command }), "ask", flag);
+  }
+  assert.equal(run("Bash", { command: "acli jira workitem create --project W --type Task --summary x" }), "allow");
+});
