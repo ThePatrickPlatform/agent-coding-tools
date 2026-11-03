@@ -66,10 +66,24 @@ created on each site, from standalone create calls only, so it can allow
 editing them. If the hook itself fails, for example because the policy file is
 malformed, it blocks the call.
 
-It also asks before any tool changes the policy file or the hook's list of
-created issues, so an agent cannot loosen its own limits.
+It also asks before a tool touches the policy file or the hook's list of
+created issues, and before `acli` switches site, so an agent does not loosen
+its own limits by mistake.
 
-Shell checks are best-effort. The hook recognises common HTTP clients and
-blocks writes it can see; when a command reaches an Atlassian site in a way it
-cannot read, such as a script, it asks the user. Jira's own permissions are
-the real authority, and the hook cannot see writes made by other programs.
+### Limits
+
+The hook catches mistakes; it is not a security boundary. Jira's own
+permissions are the real authority. In particular:
+
+- **Shell checks are best-effort.** The hook reads the command text. It blocks
+  REST writes it can see and asks when a command reaches an Atlassian site in
+  a way it cannot read, but it cannot see a site address hidden in a
+  variable, built at run time, or kept in a script file that is written first
+  and run later.
+- **It only sees the agent's own tool calls,** not other programs, scripts,
+  or anything you run yourself.
+- **It needs Node.js.** Without it, Claude Code skips the hook and the policy
+  is not enforced.
+
+Where locked content really must not change, rely on Jira permissions as well,
+for example by limiting who can edit stories and epics in the project.

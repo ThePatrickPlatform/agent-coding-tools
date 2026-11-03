@@ -36,7 +36,8 @@ const MCP_WRITES = {
 const JIRA_TOOL = /Jira|IssueLink|Worklog/;
 const READ_TOOL = /^(get|search|lookup|list|fetch)/i;
 const WRITE_VERB = /^(create|edit|update|delete|remove|add|transition|assign|move|archive)/i;
-const FILE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+const SHELL_TOOLS = new Set(["bash", "powershell"]);
+const FILE_TOOLS = new Set(["edit", "write", "multiedit", "notebookedit", "create"]);
 
 const ACLI_READ_VERBS = new Set(["view", "search", "list", "type", "status", "get", "count", "help"]);
 const ACLI_EDIT_FLAGS = {
@@ -55,15 +56,22 @@ const REST_WRITE =
   /(-X|--request|-Method|--method)[\s=]*['"]?(POST|PUT|PATCH|DELETE)\b|(^|\s)(-d|--data[\w-]*|--json|-F|--form|-T|--upload-file|-Body|-InFile|--post-data|--post-file|--body-data|--body-file)(?=[\s=@'"]|$)/im;
 const REST_READ_SEGMENT = /^\s*(curl|wget|Invoke-RestMethod|Invoke-WebRequest|irm|iwr|\$?\w+\s*=)(\s|$)/i;
 const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
+// In shell commands, also catch globbed or quoted forms such as ~/.agent-coding-*.
+const GUARD_SHELL = /\.agent-coding|jira-policy|jira-created/i;
+// Command substitution and comments can hide what a command really does.
+const OPAQUE = /`|\$\(|(^|\s)#/;
 
 // ---- Classify a tool call into Jira write actions -----------------------
 
 export function classify(toolName, toolInput) {
   const input = toolInput ?? {};
-  if (toolName === "Bash" || toolName === "PowerShell") return classifyShell(String(input.command ?? ""));
-  if (FILE_TOOLS.has(toolName)) {
-    const file = String(input.file_path ?? input.notebook_path ?? "");
-    return GUARD_FILES.test(file) || path.resolve(file) === CREATED_FILE ? [{ kind: "guard-file" }] : [];
+  const name = toolName.toLowerCase();
+  if (SHELL_TOOLS.has(name)) return classifyShell(String(input.command ?? ""));
+  if (FILE_TOOLS.has(name)) {
+    const file = String(input.file_path ?? input.path ?? input.notebook_path ?? "");
+    const resolved = file && path.resolve(file);
+    const guarded = GUARD_FILES.test(file) || resolved === path.resolve(POLICY_FILE) || resolved === CREATED_FILE;
+    return guarded ? [{ kind: "guard-file" }] : [];
   }
   const tool = toolName.split(/__|-/).pop();
   const site = input.cloudId;
@@ -84,16 +92,17 @@ function classifyShell(command) {
       other.push(segment);
     }
   }
-  // Judge the rest as a whole, so a URL in one line and a write in the next
-  // are still seen together.
-  const rest = other.join("\n");
-  const host = rest.match(REST_HOST);
-  if (host) {
+  // Judge the whole command, so a URL in one line and a write in the next,
+  // or a REST call beside an acli command, are still seen together.
+  const host = command.match(REST_HOST);
+  const onlyAcli = other.length === 0 && actions.length > 0;
+  if (host && !onlyAcli) {
     const site = host[1] ?? host[2];
-    if (REST_WRITE.test(rest)) actions.push({ kind: "rest-write", site });
-    else if (!other.every((segment) => REST_READ_SEGMENT.test(segment))) actions.push({ kind: "rest-unknown", site });
+    const readable = !OPAQUE.test(command) && other.every((segment) => REST_READ_SEGMENT.test(segment));
+    if (REST_WRITE.test(command)) actions.push({ kind: "rest-write", site });
+    else if (!readable) actions.push({ kind: "rest-unknown", site });
   }
-  if (GUARD_FILES.test(command)) actions.push({ kind: "guard-file" });
+  if (GUARD_SHELL.test(command)) actions.push({ kind: "guard-file" });
   return actions;
 }
 
@@ -104,6 +113,7 @@ function classifyAcli(tokens) {
     const i = tokens.findIndex((t) => names.includes(t));
     return i >= 0 ? tokens[i + 1] : undefined;
   };
+  if (group === "auth") return verb === "status" ? null : { kind: "acli-auth" };
   if (group !== "workitem") {
     return verb && !ACLI_READ_VERBS.has(verb) && WRITE_VERB.test(verb) ? { kind: "unknown-write" } : null;
   }
@@ -202,7 +212,9 @@ export function decide(action, rule, createdKeys) {
       const content = action.fields.filter((f) => !rule.editableFields.includes(f));
       if (content.length === 0) return null;
       if (action.bulk) return deny(`Bulk edits of ${content.join(", ")} are not allowed on ${where}.`);
-      if (action.key && createdKeys.includes(action.key)) return null;
+      // The created-issue exemption never covers changing the type, which
+      // could turn a Task into a locked Story.
+      if (action.key && createdKeys.includes(action.key) && !content.includes("issuetype")) return null;
       return ask(
         `${action.key ?? "This issue"} may be a ${locked}; their content (${content.join(", ")}) is locked on ${where}. ` +
           `Only approve if it is not a ${locked}. Otherwise add a comment proposing the change for the product owner.`,
@@ -234,6 +246,9 @@ export function evaluate(event, { policy, acliSite, createdKeys }) {
       return ask(`This changes or reads the Jira policy guard's files. Only the user should change the Jira policy; approve only if you asked for this.`);
     }
     if (policy === null) return null;
+    if (action.kind === "acli-auth") {
+      return ask(`This changes which Jira site acli is signed in to, which changes the policy that applies. Approve only if you asked for this.`);
+    }
     const site = action.site === "acli" ? acliSite() : action.site;
     return decide(action, siteRule(policy, site), createdKeys(site));
   });
@@ -242,16 +257,37 @@ export function evaluate(event, { policy, acliSite, createdKeys }) {
 
 // ---- Remember issues the agent created ----------------------------------
 
-// Returns the key from a successful, standalone create, or null.
+// Returns the key from a successful, standalone create, or null. The key
+// must be the top-level "key" of the JSON the create returned, so text inside
+// a summary or on stderr cannot add one.
 export function createdKey(event) {
   const command = String(event.tool_input?.command ?? "");
-  if (/[;&|\n]/.test(command)) return null;
+  if (/[;&|\n]/.test(command) || OPAQUE.test(command)) return null;
   const actions = classify(event.tool_name, event.tool_input);
   if (actions.length !== 1 || actions[0].kind !== "create") return null;
-  const response = event.tool_response ?? {};
-  const text = JSON.stringify(response);
-  if (response.isError || /\\*"isError\\*"\s*:\s*true/.test(text)) return null;
-  return text.match(/\\*"key\\*"\s*:\s*\\*"([A-Z][A-Z0-9_]*-\d+)\\*"/)?.[1] ?? null;
+  const response = event.tool_response;
+  if (!response || response.isError) return null;
+  const candidates = command
+    ? [response.stdout]
+    : [response, ...[response.content ?? response].flat().map((block) => block?.text)];
+  for (const candidate of candidates) {
+    const key = topLevelKey(candidate);
+    if (key) return key;
+  }
+  return null;
+}
+
+function topLevelKey(value) {
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  const key = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.key : null;
+  return typeof key === "string" && /^[A-Z][A-Z0-9_]*-\d+$/.test(key) ? key : null;
 }
 
 function readJson(file) {

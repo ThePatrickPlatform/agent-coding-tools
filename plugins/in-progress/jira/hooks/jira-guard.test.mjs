@@ -167,3 +167,46 @@ test("records keys only from a standalone, successful create", () => {
   assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: acliCreate }, tool_response: { stdout: "created W-45" } }), null);
   assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: "echo W-1" }, tool_response: "W-1" }), null);
 });
+
+test("created keys come only from the create's own JSON", () => {
+  const create = "acli jira workitem create --project W --type Task --summary t --json";
+  const withSubstitution = "acli jira workitem create --project W --type Task --summary $(printf x) --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: withSubstitution }, tool_response: { stdout: '{"key":"W-1"}' } }), null);
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: create }, tool_response: { stdout: "ok", stderr: '{"key":"W-1"}' } }), null);
+  const mcpCreate = { tool_name: mcp("createJiraIssue"), tool_input: { ...work, issueTypeName: "Task" } };
+  const nested = [{ type: "text", text: JSON.stringify({ fields: { summary: '"key":"W-1"' }, key: "W-50" }) }];
+  assert.equal(createdKey({ ...mcpCreate, tool_response: nested }), "W-50");
+});
+
+test("REST calls cannot hide behind an acli command or substitution", () => {
+  const url = `https://${WORK}/rest/api/3/issue/W-1`;
+  assert.equal(run("Bash", { command: `curl -X DELETE ${url} # acli jira workitem view W-1` }), "deny");
+  assert.equal(run("Bash", { command: `acli jira workitem view W-1 $(curl -X PUT ${url} -d @f)` }), "deny");
+  assert.equal(run("Bash", { command: `acli jira workitem view W-1 $(curl ${url})` }), "ask");
+});
+
+test("switching the acli site asks first", () => {
+  assert.equal(run("Bash", { command: `acli jira auth switch --site ${WORK}` }, { acliSite: HOME }), "ask");
+  const cmd = `acli jira auth switch --site ${WORK} && acli jira workitem edit --key W-1 --summary x --yes`;
+  assert.equal(run("Bash", { command: cmd }, { acliSite: HOME }), "ask");
+  assert.equal(run("Bash", { command: "acli jira auth status" }), "allow");
+});
+
+test("a created Task cannot be turned into a Story without asking", () => {
+  const created = { [WORK]: ["W-7"] };
+  const edit = { ...work, issueIdOrKey: "W-7", fields: { issuetype: { name: "Story" }, summary: "x" } };
+  assert.equal(run(mcp("editJiraIssue"), edit, { created }), "ask");
+  assert.equal(run("Bash", { command: "acli jira workitem edit --key W-7 --type Story --yes" }, { created }), "ask");
+  assert.equal(run("Bash", { command: "acli jira workitem edit --key W-7 --summary x --yes" }, { created }), "allow");
+});
+
+test("guard files are caught when globbed, quoted, or at a custom path", () => {
+  assert.equal(run("Bash", { command: "rm ~/.agent-coding-*/jira-*.json" }), "ask");
+  assert.equal(run("Bash", { command: 'cp x ~/.agent-coding-too""ls/p.json' }), "ask");
+  assert.equal(run("Bash", { command: "cd /c/Code/agent-coding-tools && git status" }), "allow");
+});
+
+test("lower-case shell tool names are still checked", () => {
+  assert.equal(run("bash", { command: "acli jira workitem delete --key W-1 --yes" }), "deny");
+  assert.equal(run("powershell", { command: "acli jira workitem delete --key W-1 --yes" }), "deny");
+});

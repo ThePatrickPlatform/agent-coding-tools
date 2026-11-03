@@ -23,7 +23,9 @@ jobs:
         run: python scripts/check_versions.py
       - name: Version bumps since main
         if: github.event_name == 'pull_request'
-        run: python scripts/check_versions.py --base origin/${{ github.base_ref }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python scripts/check_versions.py --base "origin/$BASE_REF"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
