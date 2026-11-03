@@ -20,3 +20,8 @@ jobs:
       - name: Version bumps since main
         if: github.event_name == 'pull_request'
         run: python scripts/check_versions.py --base origin/${{ github.base_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Hook tests
+        run: node --test "plugins/**/*.test.mjs"

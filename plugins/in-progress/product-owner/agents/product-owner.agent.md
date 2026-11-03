@@ -28,6 +28,13 @@ with the rest of the work.
 - **jira:** read the existing backlog before writing new stories, so you do not
   duplicate work. Create epics, stories, and their acceptance criteria in Jira
   when the user asks, after they approve the drafts.
+
+  The user's Jira site policy may lock story and epic content, for example at
+  work, where only the product owner person changes approved stories. On such
+  a site, read stories and epics but do not change them. Break them down into
+  Tasks instead, linked to the story, and comment, link, and assign as needed.
+  Draft any change to a story's content as a comment addressed to the product
+  owner, or as text the user can pass on.
 - **figma:** review designs against your stories and acceptance criteria, and
   report which criteria a design covers, partly covers, or misses. Comment on
   designs when the user asks. Do not edit the canvas; that is the UX

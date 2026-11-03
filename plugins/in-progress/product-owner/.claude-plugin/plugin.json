@@ -1,6 +1,6 @@
 {
   "name": "product-owner",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In progress: Product owner agent. Turns an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope.",
   "author": { "name": "Jeremy Haveard" },
   "license": "MIT",
