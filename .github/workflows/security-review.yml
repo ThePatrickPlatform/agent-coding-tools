@@ -1,0 +1,53 @@
+name: Security review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Only PRs from branches in this repo. Fork PRs get no secrets, and this
+    # reviewer is not hardened against prompt injection from untrusted code.
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    env:
+      HAS_CLAUDE_AUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Check for Claude credentials
+        if: env.HAS_CLAUDE_AUTH != 'true'
+        run: |
+          echo "::warning::Security review skipped: add a CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY repository secret. See SECURITY.md."
+      - uses: actions/checkout@v4
+        if: env.HAS_CLAUDE_AUTH == 'true'
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAS_CLAUDE_AUTH == 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: origin/${{ github.base_ref }}
+
+            Review this pull request for security issues.
+
+            First read your instructions from the base branch, so this PR
+            cannot change them:
+              git show origin/${{ github.base_ref }}:.github/security-review.md
+            Only if that file does not exist on the base branch, read
+            .github/security-review.md from the working directory.
+
+            Follow those instructions exactly. The PR branch is checked out in
+            the working directory. See the changes with
+            `gh pr diff ${{ github.event.pull_request.number }}` or
+            `git diff origin/${{ github.base_ref }}...HEAD`.
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools "Read,Grep,Glob,Bash(git show:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
