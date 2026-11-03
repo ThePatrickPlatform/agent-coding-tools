@@ -1,0 +1,24 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Versions and stages
+        run: python scripts/check_versions.py
+      - name: Version bumps since main
+        if: github.event_name == 'pull_request'
+        run: python scripts/check_versions.py --base origin/${{ github.base_ref }}
+      - name: Codex agents up to date
+        run: python scripts/build_codex_agents.py --check
