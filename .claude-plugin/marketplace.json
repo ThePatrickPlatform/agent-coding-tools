@@ -1,17 +1,49 @@
 {
   "name": "agent-coding-tools",
   "owner": { "name": "ThePatrickPlatform" },
-  "description": "Agents and plugins for coding with Claude Code and GitHub Copilot CLI.",
+  "description": "Agents and skills for engineers using Claude Code and GitHub Copilot CLI.",
   "plugins": [
     {
-      "name": "dev-team",
-      "source": "./plugins/dev-team",
-      "description": "In progress: Five role agents for a software team: product owner, UX designer, architect, software engineer, and QA engineer."
+      "name": "product-owner",
+      "source": "./plugins/in-progress/product-owner",
+      "category": "agent",
+      "description": "In progress: Product owner agent. Turns an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope."
+    },
+    {
+      "name": "ux-designer",
+      "source": "./plugins/in-progress/ux-designer",
+      "category": "agent",
+      "description": "In progress: UX designer agent. Designs flows, screens, interaction states, and copy, and reviews interfaces for usability and accessibility."
+    },
+    {
+      "name": "architect",
+      "source": "./plugins/in-progress/architect",
+      "category": "agent",
+      "description": "In progress: Architect agent. Decides structure, boundaries, data model, and technology, with trade-offs and implementation steps."
+    },
+    {
+      "name": "software-engineer",
+      "source": "./plugins/in-progress/software-engineer",
+      "category": "agent",
+      "description": "In progress: Software engineer agent. Implements features, fixes bugs, and refactors, following existing conventions."
+    },
+    {
+      "name": "qa-engineer",
+      "source": "./plugins/in-progress/qa-engineer",
+      "category": "agent",
+      "description": "In progress: QA engineer agent. Writes test plans, finds edge cases, verifies changes, and writes bug reports."
     },
     {
       "name": "jira",
-      "source": "./plugins/jira",
+      "source": "./plugins/in-progress/jira",
+      "category": "integration",
       "description": "In progress: Work with Jira Cloud issues using OAuth only, through the Atlassian MCP server, the Atlassian CLI, or the REST API."
+    },
+    {
+      "name": "figma",
+      "source": "./plugins/in-progress/figma",
+      "category": "integration",
+      "description": "In progress: Read and work with Figma designs using OAuth only, through the Figma MCP server or the REST API."
     }
   ]
 }
