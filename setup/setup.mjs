@@ -199,6 +199,8 @@ function checkJiraPolicy() {
     ...sites.filter(([, rule]) => !POLICY_PROFILES.includes(rule.profile)).map(([host, rule]) => `${host}: "${rule.profile}"`),
   ];
   if (bad.length > 0) fail(`unknown policy profile (${bad.join(", ")}); use ${POLICY_PROFILES.join(", ")}`);
+  const noCloudId = sites.filter(([, rule]) => rule?.profile !== "full" && !rule?.cloudId).map(([host]) => host);
+  if (noCloudId.length > 0) warn(`add a cloudId for ${noCloudId.join(", ")} so the policy applies when agents use it (see SETUP.md)`);
   const placeholders = sites.filter(([host]) => host.startsWith("your-")).map(([host]) => host);
   if (placeholders.length > 0) fail(`replace the example site names in ${POLICY_FILE}: ${placeholders.join(", ")}`);
   if (bad.length === 0 && placeholders.length === 0) {

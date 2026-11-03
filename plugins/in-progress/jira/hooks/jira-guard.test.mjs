@@ -262,3 +262,52 @@ test("creates of unknown type are not recorded", () => {
   const clone = "acli jira workitem clone --key S-1 --json";
   assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: clone }, tool_response: { stdout: '{"key":"W-60"}' } }), null);
 });
+
+test("unlisted sites ask when the default is full", () => {
+  const fullDefault = { default: "full", sites: { [WORK]: { profile: "story-content-locked" } } };
+  const story = { issueTypeName: "Story" };
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: "0b1c2d3e-uuid", ...story }, { withPolicy: fullDefault }), "ask");
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: `${WORK}.`, ...story }, { withPolicy: fullDefault }), "deny");
+  assert.equal(run(mcp("createJiraIssue"), { cloudId: HOME, ...story }), "allow");
+});
+
+test("repeated, inline, or odd issue types need approval", () => {
+  for (const command of [
+    "acli jira workitem create --project W --type Task --type Story --summary x",
+    "acli jira workitem create --project W --type=Story --summary x",
+    "acli jira workitem create --project W -t Task -t Story --summary x",
+  ]) {
+    assert.notEqual(run("Bash", { command }), "allow", command);
+  }
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "Story " }), "deny");
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "10001" }), "ask");
+  assert.equal(run("Bash", { command: 'acli jira workitem edit --key W-1 --summary="x" --yes' }), "ask");
+});
+
+test("only a real acli command records a created issue", () => {
+  const response = { stdout: '{"key":"W-61"}' };
+  const fake = "./acli jira workitem create --project W --type Task --summary x --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: fake }, tool_response: response }), null);
+  const real = "acli jira workitem create --project W --type Task --summary x --json";
+  assert.equal(createdKey({ tool_name: "Bash", tool_input: { command: real }, tool_response: response }), "W-61");
+});
+
+test("quoted issue types are read the way the shell reads them", () => {
+  for (const type of ['--type="Story"', "--type='Story'", '--type=St"o"ry', '--type "Story"', "--type=Story "]) {
+    const command = `acli jira workitem create --project W ${type} --summary x`;
+    assert.equal(run("Bash", { command }), "deny", type);
+  }
+  for (const type of [String.raw`--type=St\ory`, "--type=$T", "--type=Sto​ry"]) {
+    const command = `acli jira workitem create --project W ${type} --summary x`;
+    assert.equal(run("Bash", { command }), "ask", type);
+  }
+  assert.equal(run(mcp("createJiraIssue"), { ...work, issueTypeName: "Sto​ry" }), "ask");
+});
+
+test("escaped or ANSI-quoted flag names ask", () => {
+  for (const flag of [String.raw`-\t`, String.raw`--ty\pe`, "$'-t'"]) {
+    const command = `acli jira workitem create --project W --type Task ${flag} Story --summary x`;
+    assert.equal(run("Bash", { command }), "ask", flag);
+  }
+  assert.equal(run("Bash", { command: "acli jira workitem create --project W --type Task --summary x" }), "allow");
+});

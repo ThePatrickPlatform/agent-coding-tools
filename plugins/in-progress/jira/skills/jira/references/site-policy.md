@@ -22,8 +22,11 @@ policy file; never create or edit it for them unless they ask.
 }
 ```
 
-- Sites are keyed by hostname. Add `"cloudId": "<id>"` to an entry if a tool
-  identifies the site by its cloud ID instead.
+- Sites are keyed by hostname. Also add `"cloudId": "<id>"` to every site
+  that is not `full`, because tools often name a site by its cloud ID. Find it
+  at `https://<your-site>.atlassian.net/_edge/tenant_info`.
+- If `default` is `full`, writes to a site that is not listed ask first, so a
+  limited site named by an unknown ID is never treated as full.
 - A site that is not listed gets `default`. If `default` is missing, it is
   `read-only`.
 - With no policy file, nothing is restricted.

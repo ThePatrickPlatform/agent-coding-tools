@@ -55,7 +55,7 @@ None yet. See [Contributing](CONTRIBUTING.md) to add one.
 
 | Plugin | Stage | Version | Description |
 | --- | --- | --- | --- |
-| [`jira`](plugins/in-progress/jira) | in-progress | 0.0.2 | Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
+| [`jira`](plugins/in-progress/jira) | in-progress | 0.0.3 | Jira Cloud issues, OAuth only. Uses the Atlassian MCP server, the Atlassian CLI (`acli`), or the REST API, whichever is available. |
 | [`figma`](plugins/in-progress/figma) | in-progress | 0.0.1 | Figma designs, OAuth only. Uses the Figma MCP server or the REST API, whichever is available. |
 
 ## How agents use skills

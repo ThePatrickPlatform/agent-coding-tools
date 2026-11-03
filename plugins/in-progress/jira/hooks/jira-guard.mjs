@@ -26,7 +26,7 @@ const DEFAULT_EDITABLE_FIELDS = ["assignee"];
 const PROFILES = ["full", "read-only", "story-content-locked"];
 
 const MCP_WRITES = {
-  createJiraIssue: (input) => ({ kind: "create", issueType: input.issueTypeName }),
+  createJiraIssue: (input) => ({ kind: "create", issueType: issueType([input.issueTypeName]) }),
   editJiraIssue: (input) => ({
     kind: "edit",
     keys: input.issueIdOrKey ? [String(input.issueIdOrKey)] : [],
@@ -62,8 +62,9 @@ const REST_WRITE =
 const GUARD_FILES = /jira-policy\.json|jira-created-issues|\.agent-coding-tools/i;
 // In shell commands, also catch globbed or quoted forms such as ~/.agent-coding-*.
 const GUARD_SHELL = /\.agent-coding|jira-policy|jira-created/i;
-// Command substitution and comments can hide what a command really does.
-const OPAQUE = /`|\$\(|<\(|(^|\s)#/;
+// Command substitution, comments, backslash escapes, and $'...' quoting can
+// hide what a command really does.
+const OPAQUE = /`|\$\(|<\(|(^|\s)#|\\|\$['"]/;
 
 // ---- Classify a tool call into Jira write actions -----------------------
 
@@ -127,7 +128,7 @@ function classifyAcli(tokens) {
   }
   switch (verb) {
     case "create":
-      return { kind: "create", issueType: flags.includes("--from-json") ? undefined : flagValue("--type", "-t") };
+      return { kind: "create", issueType: flags.includes("--from-json") ? undefined : issueType(flagValues("--type", "-t")) };
     case "create-bulk":
     case "clone":
       return { kind: "create", issueType: undefined };
@@ -152,12 +153,34 @@ function classifyAcli(tokens) {
   }
 }
 
+// The one issue type named, or undefined when it is missing, repeated, or
+// not a plain name: a numeric type ID, or anything with quotes, escapes,
+// variables, or unusual characters that could hide a locked type.
+function issueType(values) {
+  const names = values.filter((v) => v !== undefined).map((v) => String(v).trim());
+  const plain = names.length === 1 && /^[A-Za-z0-9 _-]+$/.test(names[0]) && /[a-z]/i.test(names[0]);
+  return plain ? names[0] : undefined;
+}
+
+// Splits text into words the way a shell does, joining quoted and unquoted
+// parts of one word (--type="Story" is --type=Story), then splits --flag=value.
 function tokenize(text) {
-  return [...text.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  const words = [];
+  let word = null;
+  for (const m of text.matchAll(/"([^"]*)"|'([^']*)'|(\s+)|([^\s"']+)/g)) {
+    if (m[3] !== undefined) {
+      if (word !== null) words.push(word);
+      word = null;
+    } else {
+      word = (word ?? "") + (m[1] ?? m[2] ?? m[4]);
+    }
+  }
+  if (word !== null) words.push(word);
+  return words.flatMap((t) => t.match(/^(--?[\w-]+)=(.*)$/s)?.slice(1) ?? [t]);
 }
 
 export function siteId(site) {
-  return String(site ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  return String(site ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/\.+$/, "");
 }
 
 // ---- Decide -------------------------------------------------------------
@@ -185,6 +208,7 @@ export function siteRule(policy, site) {
   const valid = resolved && typeof resolved === "object" && lockedTypes && editableFields;
   return {
     host: host ?? (id || "an unidentified site"),
+    unlisted: rule === undefined,
     profile: valid ? resolved.profile : "invalid",
     lockedTypes: (lockedTypes ?? []).map((t) => t.toLowerCase()),
     editableFields: editableFields ?? [],
@@ -196,7 +220,13 @@ export function decide(action, rule, createdKeys) {
   if (!PROFILES.includes(rule.profile)) {
     return deny(`The Jira policy for ${rule.host} is invalid ("${rule.profile}"). Fix ${POLICY_FILE}.`);
   }
-  if (rule.profile === "full") return null;
+  if (rule.profile === "full") {
+    // A site may be named by its cloud ID, which a policy listing only its
+    // hostname cannot match. Do not let a permissive default cover it.
+    return rule.unlisted
+      ? ask(`${rule.host} is not listed in ${POLICY_FILE}, so its rules are unknown. Approve only if this is a site you may change freely, and add it to the policy (with its cloudId).`)
+      : null;
+  }
   if (rule.profile === "read-only") {
     return deny(`Jira site ${where} is read-only. Do not retry. Tell the user what you would have changed.`);
   }
@@ -272,6 +302,7 @@ export function evaluate(event, { policy, acliSite, createdKeys }) {
 export function createdKey(event) {
   const command = String(event.tool_input?.command ?? "");
   if (/[;&|\n]/.test(command) || OPAQUE.test(command)) return null;
+  if (command && !/^\s*acli(?:\.exe)?\s/i.test(command)) return null;
   const actions = classify(event.tool_name, event.tool_input);
   if (actions.length !== 1 || actions[0].kind !== "create" || !actions[0].issueType) return null;
   const response = event.tool_response;
