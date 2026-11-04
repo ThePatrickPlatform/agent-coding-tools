@@ -8,6 +8,9 @@
 //   --profile <name[,name]>   profiles from setup/profiles.json (required)
 //   --tool claude|copilot     only set up one tool (default: every one installed)
 //   --check                   change nothing; exit 1 if anything is missing
+//   --jira-site <host>        add or update this site in your Jira site policy,
+//   --jira-access <profile>   with this access (full, story-content-locked, or
+//                             read-only), looking up its cloudId
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -22,6 +25,7 @@ const MKT = CONFIG.marketplace.name;
 const POLICY_FILE =
   process.env.JIRA_POLICY_FILE ?? path.join(os.homedir(), ".agent-coding-tools", "jira-policy.json");
 const POLICY_PROFILES = ["full", "read-only", "story-content-locked"];
+const LOCKED_DEFAULTS = { lockedTypes: ["Story", "Epic"], editableFields: ["assignee"] };
 
 const args = parseArgs(process.argv.slice(2));
 const CHECK = args.check;
@@ -45,12 +49,23 @@ function parseArgs(argv) {
   };
   const profiles = value("--profile")?.split(",").filter(Boolean) ?? [];
   const unknown = profiles.filter((p) => !CONFIG.profiles[p]);
-  if (profiles.length === 0 || unknown.length > 0) {
-    console.error(`Usage: node setup/setup.mjs --profile <${Object.keys(CONFIG.profiles).join("|")}> [--tool claude|copilot] [--check]`);
-    if (unknown.length > 0) console.error(`Unknown profile: ${unknown.join(", ")}`);
+  const jiraSite = value("--jira-site")?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const jiraAccess = value("--jira-access");
+  const problems = [
+    ...(unknown.length > 0 ? [`Unknown profile: ${unknown.join(", ")}`] : []),
+    ...(jiraSite !== undefined && !/^[a-z0-9-]+\.atlassian\.net$/.test(jiraSite) ? ["--jira-site must be a site like your-company.atlassian.net"] : []),
+    ...(Boolean(jiraSite) !== Boolean(jiraAccess) ? ["--jira-site and --jira-access go together"] : []),
+    ...(jiraAccess && !POLICY_PROFILES.includes(jiraAccess) ? [`--jira-access must be one of ${POLICY_PROFILES.join(", ")}`] : []),
+  ];
+  if (profiles.length === 0 || problems.length > 0) {
+    console.error(
+      `Usage: node setup/setup.mjs --profile <${Object.keys(CONFIG.profiles).join("|")}> [--tool claude|copilot] [--check]\n` +
+        `       [--jira-site <host> --jira-access <${POLICY_PROFILES.join("|")}>]`,
+    );
+    problems.forEach((p) => console.error(p));
     process.exit(2);
   }
-  return { profiles, tool: value("--tool"), check: argv.includes("--check") };
+  return { profiles, tool: value("--tool"), check: argv.includes("--check"), jiraSite, jiraAccess };
 }
 
 // On Windows, claude and copilot are often .cmd shims, which need a shell.
@@ -181,10 +196,47 @@ function checkNode() {
   else fail(`Node.js ${process.versions.node}; plugin hooks need 20 or later`);
 }
 
+// The cloud ID identifies a site; tenant_info serves it without signing in.
+async function lookUpCloudId(host) {
+  try {
+    const response = await fetch(`https://${host}/_edge/tenant_info`, { signal: AbortSignal.timeout(15000) });
+    const cloudId = response.ok ? (await response.json()).cloudId : undefined;
+    return typeof cloudId === "string" && /^[0-9a-f-]{36}$/i.test(cloudId) ? cloudId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Adds or updates one site in the policy file, keeping everything else.
+async function setJiraSite(host, access) {
+  let policy = { default: "read-only", sites: {} };
+  if (fs.existsSync(POLICY_FILE)) {
+    try {
+      policy = readJson(POLICY_FILE);
+    } catch (err) {
+      return fail(`${POLICY_FILE} is not valid JSON, so ${host} was not added: ${err.message}`);
+    }
+  }
+  const current = policy.sites?.[host];
+  const { profile: _, ...kept } = current ?? {};
+  const wanted = { profile: access, ...(access === "story-content-locked" ? LOCKED_DEFAULTS : {}), ...kept };
+  if (access !== "full" && !wanted.cloudId) {
+    wanted.cloudId = await lookUpCloudId(host);
+    if (!wanted.cloudId) return fail(`could not look up the cloudId for ${host}; check the site name, then see SETUP.md step 5`);
+  }
+  const sorted = (rule) => JSON.stringify(rule, Object.keys(rule ?? {}).sort());
+  if (sorted(current) === sorted(wanted)) return ok(`Jira policy: ${host} ${access}`);
+  if (CHECK) return fail(`Jira policy: set ${host} to ${access} (run setup without --check)`);
+  policy.sites = { ...policy.sites, [host]: wanted };
+  fs.mkdirSync(path.dirname(POLICY_FILE), { recursive: true });
+  fs.writeFileSync(POLICY_FILE, JSON.stringify(policy, null, 2) + "\n");
+  console.log(`  → Jira policy: set ${host} to ${access} in ${POLICY_FILE}`);
+}
+
 function checkJiraPolicy() {
   if (!fs.existsSync(POLICY_FILE)) {
     warn(`no Jira site policy at ${POLICY_FILE}; every site has full access`);
-    warn(`to limit sites, copy setup/jira-policy.example.json there and edit it`);
+    warn(`to limit a site, run setup with --jira-site <host> --jira-access <profile> (see SETUP.md)`);
     return;
   }
   let policy;
@@ -215,7 +267,7 @@ function checkAcli() {
   else warn("acli is installed but not signed in; run: acli jira auth login (choose the web browser option)");
 }
 
-function main() {
+async function main() {
   const wanted = wantedPlugins();
   const commit = run("git", ["-C", ROOT, "log", "-1", "--format=%h %cs"], { quiet: true, shell: false }).out.trim();
   console.log(`${CHECK ? "Checking" : "Setting up"} profile ${args.profiles.join(", ")} from ${CONFIG.marketplace.repo} (${commit})`);
@@ -224,6 +276,7 @@ function main() {
   console.log("Machine");
   checkClone();
   checkNode();
+  if (args.jiraSite) await setJiraSite(args.jiraSite, args.jiraAccess);
   if (wanted.has("jira")) {
     checkJiraPolicy();
     checkAcli();
