@@ -1,6 +1,6 @@
 {
   "name": "software-engineer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In progress: Software engineer agent. Implements features, fixes bugs, and refactors, following existing conventions.",
   "author": { "name": "Jeremy Haveard" },
   "license": "MIT",

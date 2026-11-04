@@ -62,7 +62,21 @@ metadata:
 ---
 ```
 
-**Agents** carry no version of their own. They are versioned by their plugin.
+**Agents** are versioned by their plugin. The agent's `description` starts
+with its role, the plugin's version, and the stage, so people see the version
+in each tool's agent list:
+
+```yaml
+---
+name: architect
+description: Software architect v0.0.2 (in progress). Use to decide...
+---
+```
+
+Alpha and beta agents use `(alpha)` and `(beta)`; release agents leave the
+stage out, as in `Software architect v1.0.0. Use to...`. The `name` never
+includes the version, because people call agents by name and a name that
+changed with every bump would break those calls.
 
 ## Choosing the next version
 
@@ -91,7 +105,8 @@ python scripts/check_versions.py --base origin/main
 ```
 
 `check_versions.py` checks that versions are valid and fit the stage, and that
-descriptions carry the right prefix and match the marketplace. With `--base`,
+descriptions carry the right prefix and match the marketplace, and that each
+agent's description shows its plugin's version and stage. With `--base`,
 it also fails if a plugin or skill changed since that ref without a version
 bump. The `Checks` workflow runs both on every pull request.
 
