@@ -5,6 +5,32 @@ up changes. The setup script installs the same plugins, versions, and MCP
 servers every time, for both Claude Code and GitHub Copilot CLI, so every
 machine ends up configured the same way.
 
+## Rolling this out to a team
+
+This repo is public, so it never names your company's Jira site. Give your
+team the site name in your internal setup notes, and have everyone run the
+same command. For example, for product owners on Copilot CLI:
+
+```
+git clone https://github.com/ThePatrickPlatform/agent-coding-tools.git
+cd agent-coding-tools
+node setup/setup.mjs --profile product-owner --tool copilot --jira-site <your-company>.atlassian.net --jira-access story-content-locked
+```
+
+Then each person signs in once (step 4) and runs the check (step 6).
+
+Before you start:
+
+- **Ask your Atlassian admin** whether the Atlassian MCP server
+  (`mcp.atlassian.com`) is allowed for your site. Admins can restrict which
+  apps connect to Jira; if it is blocked, sign-in fails in step 4.
+- **Choose each person's access.** Use `story-content-locked` for everyone
+  whose Jira role does not let them change approved stories. The product owner
+  who owns the stories can use `full`; agents still show every change and wait
+  for approval.
+- **Pick one tool for the team** if you can, and pass `--tool claude` or
+  `--tool copilot`, so everyone's setup matches.
+
 ## 1. Install the prerequisites
 
 | Tool | Needed for | Check |
@@ -16,6 +42,9 @@ machine ends up configured the same way.
 
 You need at least one of Claude Code and Copilot CLI. The script sets up
 whichever are installed.
+
+To install Node.js: on macOS, `brew install node`; on Windows,
+`winget install OpenJS.NodeJS.LTS`; or download it from nodejs.org.
 
 Node.js must stay on your `PATH`. The `jira` plugin's safety check runs on it.
 If Node.js is missing, Copilot CLI blocks every shell command, and Claude Code
@@ -84,52 +113,45 @@ Never choose the API token option; these plugins only use OAuth.
 
 Skip this if you only use one Jira site and want full access there.
 
-The policy decides what agents may change on each Jira site. Copy the example
-into your home folder:
+The policy decides what agents may change on each Jira site. Run the setup
+script once for each site you use, with the hostname from your Jira address
+bar and the access you want there:
 
 ```
-mkdir -p ~/.agent-coding-tools
-cp setup/jira-policy.example.json ~/.agent-coding-tools/jira-policy.json
+node setup/setup.mjs --profile product-owner --jira-site <your-company>.atlassian.net --jira-access story-content-locked
+node setup/setup.mjs --profile product-owner --jira-site <your-personal-site>.atlassian.net --jira-access full
 ```
 
-On Windows PowerShell:
-
-```
-New-Item -ItemType Directory -Force "$HOME\.agent-coding-tools"
-Copy-Item setup\jira-policy.example.json "$HOME\.agent-coding-tools\jira-policy.json"
-```
-
-Edit the file. Replace each example site with the hostname from your Jira
-address bar, such as `example-company.atlassian.net`, and pick a profile for each:
-
-| Profile | Use it for | Agents can |
+| Access | Use it for | Agents can |
 | --- | --- | --- |
-| `full` | Your personal site | Make any change, after you approve it |
+| `full` | Your personal site, or the product owner who owns the stories | Make any change, after you approve it |
 | `story-content-locked` | A site where only the product owner changes approved stories | Read, comment, link, assign, change status, log work, and create and edit Tasks. Not create stories or epics, or change their content. |
 | `read-only` | Any site you only want to look at | Search and read |
 
-For every site that is not `full`, also add its `cloudId`, because agents
-often name a site by its cloud ID rather than its hostname. Open
-`https://<your-site>.atlassian.net/_edge/tenant_info` in your browser and copy
-the `cloudId` value:
+The script writes `~/.agent-coding-tools/jira-policy.json`, keeping any sites
+already there. For each site that is not `full`, it looks up the site's
+`cloudId` from `https://<site>/_edge/tenant_info`, because agents often name a
+site by its cloud ID rather than its hostname. If the lookup fails, check the
+site name.
+
+Any site not in the file is `read-only`. Keep that default, so a new site is
+protected until you add it.
+
+For `story-content-locked`, `editableFields` lists the fields anyone may still
+change on a story or epic. The script allows only `assignee`. Add fields your
+team lets everyone change, such as `labels`, by editing the file:
 
 ```json
 "your-company.atlassian.net": {
   "profile": "story-content-locked",
-  "cloudId": "<cloudId from tenant_info>"
+  "lockedTypes": ["Story", "Epic"],
+  "editableFields": ["assignee", "labels"],
+  "cloudId": "<filled in by the script>"
 }
 ```
 
-The cloud ID identifies your site, so this file stays on your machine.
-
-Any site not in the file gets `default`, which is `read-only` in the example.
-Keep the default strict, so a new site is protected until you add it.
-
-For `story-content-locked`, `editableFields` lists the fields anyone may still
-change on a story or epic. The example allows only `assignee`. Add fields your
-team lets everyone change, such as `labels`.
-
-The file stays on your machine. Do not commit it to any repo.
+`setup/jira-policy.example.json` shows the whole format. The file stays on
+your machine. Do not commit it to any repo.
 
 ## 6. Check the setup
 
@@ -140,7 +162,8 @@ node setup/setup.mjs --profile engineer --check
 `--check` changes nothing. It lists each item as `✔` (done), `!` (optional
 or a warning), or `✖` (missing), and exits with an error if anything is
 missing. It also checks your Jira policy for typos and leftover example
-sites.
+sites. Add the same `--jira-site` and `--jira-access` options to confirm a
+site has the access you expect.
 
 Then, in each tool:
 
