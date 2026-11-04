@@ -1,6 +1,6 @@
 {
   "name": "ux-designer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In progress: UX designer agent. Designs flows, screens, interaction states, and copy, and reviews interfaces for usability and accessibility.",
   "author": { "name": "Jeremy Haveard" },
   "license": "MIT",

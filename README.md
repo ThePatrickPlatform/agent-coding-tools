@@ -41,11 +41,11 @@ the default branch, including work in progress.
 
 | Plugin | Stage | Version | Uses | Use it to |
 | --- | --- | --- | --- | --- |
-| [`product-owner`](plugins/in-progress/product-owner) | in-progress | 0.0.2 | jira, figma | Turn an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope. |
-| [`ux-designer`](plugins/in-progress/ux-designer) | in-progress | 0.0.1 | figma | Design flows, screens, interaction states, and copy, or review an interface for usability and accessibility. |
-| [`architect`](plugins/in-progress/architect) | in-progress | 0.0.1 | | Decide structure, boundaries, data model, and technology, with trade-offs and implementation steps. |
-| [`software-engineer`](plugins/in-progress/software-engineer) | in-progress | 0.0.1 | jira | Implement features, fix bugs, and refactor, following existing conventions. |
-| [`qa-engineer`](plugins/in-progress/qa-engineer) | in-progress | 0.0.1 | | Write test plans, find edge cases, verify changes, and write bug reports. |
+| [`product-owner`](plugins/in-progress/product-owner) | in-progress | 0.0.3 | jira, figma | Turn an idea into a problem statement, user stories with acceptance criteria, and a prioritized scope. |
+| [`ux-designer`](plugins/in-progress/ux-designer) | in-progress | 0.0.2 | figma | Design flows, screens, interaction states, and copy, or review an interface for usability and accessibility. |
+| [`architect`](plugins/in-progress/architect) | in-progress | 0.0.2 | | Decide structure, boundaries, data model, and technology, with trade-offs and implementation steps. |
+| [`software-engineer`](plugins/in-progress/software-engineer) | in-progress | 0.0.2 | jira | Implement features, fix bugs, and refactor, following existing conventions. |
+| [`qa-engineer`](plugins/in-progress/qa-engineer) | in-progress | 0.0.2 | | Write test plans, find edge cases, verify changes, and write bug reports. |
 
 ### Skills
 

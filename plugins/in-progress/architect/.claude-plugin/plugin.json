@@ -1,6 +1,6 @@
 {
   "name": "architect",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In progress: Architect agent. Decides structure, boundaries, data model, and technology, with trade-offs and implementation steps.",
   "author": { "name": "Jeremy Haveard" },
   "license": "MIT"

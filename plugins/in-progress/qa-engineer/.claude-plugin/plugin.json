@@ -1,6 +1,6 @@
 {
   "name": "qa-engineer",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In progress: QA engineer agent. Writes test plans, finds edge cases, verifies changes, and writes bug reports.",
   "author": { "name": "Jeremy Haveard" },
   "license": "MIT"

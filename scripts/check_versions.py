@@ -88,6 +88,14 @@ def read_skill(text):
     }
 
 
+def check_agent(agent_path, version, stage):
+    """Agent descriptions start with "<Role> v<version> (<stage>). "."""
+    description = read_skill(agent_path.read_text(encoding="utf-8"))["description"]
+    label = "" if stage == "release" else f" ({stage.replace('-', ' ')})"
+    if not re.match(rf"[^.]+ v{re.escape(version or '')}{re.escape(label)}\. ", description):
+        error(agent_path.relative_to(ROOT), f"description must start with '<Role> v{version}{label}. '")
+
+
 def check_plugin(plugin_dir, marketplace):
     name = plugin_dir.name
     manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
@@ -118,6 +126,9 @@ def check_plugin(plugin_dir, marketplace):
             error(".claude-plugin/marketplace.json", f"source for {name} must be {source}")
         if entry.get("category") not in CATEGORIES:
             error(".claude-plugin/marketplace.json", f"category for {name} must be one of {', '.join(CATEGORIES)}")
+
+    for agent_path in sorted(plugin_dir.glob("agents/*.agent.md")):
+        check_agent(agent_path, manifest.get("version"), stage)
 
     for skill_path in sorted(plugin_dir.glob("skills/*/SKILL.md")):
         skill = read_skill(skill_path.read_text(encoding="utf-8"))
